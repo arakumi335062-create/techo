@@ -111,6 +111,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 .row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:0}
 .row label{flex:1}
+.row label.sw{flex:none}
 .row select{width:auto;min-width:120px}
 .row .sub{display:block;font-size:12px;color:var(--sub)}
 .btn{border-radius:12px;padding:12px 16px;font-weight:600;background:var(--surface2);border:1px solid var(--line)}
@@ -322,8 +323,9 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <h2>🔐 機密・ロック</h2>
     <div class="row"><label>自動ロックまでの時間<span class="sub">操作しないとロックします</span></label>
       <select id="sIdle"><option value="1">1分</option><option value="3">3分</option><option value="5">5分</option><option value="10">10分</option><option value="30">30分</option></select></div>
-    <div class="row"><label>アプリを離れたらすぐロック<span class="sub">ホーム画面に戻ったとき等</span></label><span class="sw"><input type="checkbox" id="sHide"><span></span></span></div>
-    <div class="row"><label>通知の題名は「予定あり」だけにする（初期値）<span class="sub">iPhoneのカレンダーに題名を残さない</span></label><span class="sw"><input type="checkbox" id="sSecretDef"><span></span></span></div>
+    <div class="row"><label>アプリを離れたらすぐロック<span class="sub">ホーム画面に戻ったとき等</span></label><label class="sw"><input type="checkbox" id="sHide"><span></span></label></div>
+    <div class="row"><label>通知の題名は「予定あり」だけにする（初期値）<span class="sub">iPhoneのカレンダーに題名を残さない</span></label><label class="sw"><input type="checkbox" id="sSecretDef"><span></span></label></div>
+    <div class="row"><label>Face ID（顔認証）で開く<span class="sub" id="sBioSub">暗証番号の代わりに顔で開きます</span></label><label class="sw"><input type="checkbox" id="sBio"><span></span></label></div>
     <div class="row"><button class="btn wide" id="sChangePass">暗証番号を変える</button></div>
   </section>
   <section class="card" id="cBackup" data-tabs="set">
@@ -414,6 +416,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
   <div class="lk">🔒</div>
   <h2 id="lkH">システム手帳</h2>
   <p id="lkP">暗証番号を入れてください</p>
+  <button class="btn hidden" id="lkBio" style="margin-bottom:14px;font-size:18px;padding:14px">🙂 Face IDで開く</button>
   <input type="password" id="lkIn" autocomplete="current-password" inputmode="numeric" placeholder="••••••">
   <input type="password" id="lkIn2" class="hidden" autocomplete="new-password" inputmode="numeric" placeholder="もう一度">
   <button class="btn" id="lkGo">開く</button>
@@ -512,9 +515,12 @@ const decJ = async (r, key) => JSON.parse(td.decode(await decB(r, key)));
 
 /* ============ ロック ============ */
 let lockMode = "unlock", fails = 0, waitUntil = 0;
+let lockMeta = null;
 async function initLock() { const meta = await dbGet("meta", "k"); lockMode = meta ? "unlock" : "setup"; showLock(); }
 function showLock() {
   $("#lock").classList.remove("hidden");
+  lockMeta = null; bioTried = false; $("#lkBio").classList.add("hidden");
+  dbGet("meta", "k").then(m => { lockMeta = m || null; const bio = !!(m && m.bio) && lockMode === "unlock"; $("#lkBio").classList.toggle("hidden", !bio); if (bio) bioAuto(); }).catch(() => {});
   $("#lkIn").value = ""; $("#lkIn2").value = ""; $("#lkErr").textContent = "";
   $("#lkIn2").classList.toggle("hidden", lockMode !== "setup");
   if (lockMode === "setup") {
@@ -539,14 +545,21 @@ $("#lkAbc").onclick = () => {
   $("#lkAbc").textContent = num ? "数字だけにする" : "英字も使う"; $("#lkIn").focus();
 };
 ["#lkIn", "#lkIn2"].forEach(s => $(s).addEventListener("keydown", e => { if (e.key === "Enter") $("#lkGo").click(); }));
-$("#lkGo").onclick = async () => {
+/* 決めた桁数まで入れたら、ボタンを押さなくても開く */
+$("#lkIn").addEventListener("input", () => {
+  if (lockMode !== "unlock" || !lockMeta || !lockMeta.plen) return;
+  if ($("#lkIn").value.length === lockMeta.plen) $("#lkGo").click();
+});
+let lkBusy = false;
+$("#lkGo").onclick = async () => { if (lkBusy) return; lkBusy = true; try { await lkGo(); } finally { lkBusy = false; } };
+async function lkGo() {
   const p = $("#lkIn").value, err = $("#lkErr");
   if (Date.now() < waitUntil) { err.textContent = "間違いが続いたため " + Math.ceil((waitUntil - Date.now()) / 1000) + " 秒お待ちください"; return; }
   if (lockMode === "setup") {
     if (p.length < 4) { err.textContent = "4文字以上にしてください"; return; }
     if (p !== $("#lkIn2").value) { err.textContent = "2回の入力が違います"; return; }
     err.textContent = "準備中…";
-    const meta = await wrapMaster(await newMaster(), p);
+    const meta = await wrapMaster(await newMaster(), p); meta.plen = p.length;
     await dbPut("meta", "k", meta);
     S.key = await unwrapMaster(meta, p);
     S.settings = structuredClone(DEF_SETTINGS);
@@ -560,6 +573,7 @@ $("#lkGo").onclick = async () => {
   try {
     S.key = meta.v === 2 ? await unwrapMaster(meta, p) : await migrateV1(meta, p);
     fails = 0;
+    { const m2 = await dbGet("meta", "k"); if (m2 && m2.plen !== p.length) { m2.plen = p.length; await dbPut("meta", "k", m2); } }
     await afterUnlock(false);
   } catch (e) {
     S.key = null; $("#lkIn").value = "";
@@ -568,7 +582,72 @@ $("#lkGo").onclick = async () => {
     if (fails >= 5) { waitUntil = Date.now() + Math.min(300, 30 * (fails - 4)) * 1000; err.textContent = "暗証番号が違います（" + fails + "回）。しばらくお待ちください"; }
     else err.textContent = "暗証番号が違います";
   }
-};
+}
+/* ============ Face ID（パスキー＋PRF）============
+   iPhoneの中の安全な場所（Secure Enclave／iCloudキーチェーン）にパスキーを作り、
+   顔認証が通ったときだけ出てくる秘密の値で、データ鍵を包んでこの端末だけに保存する。 */
+const BIO_SALT = te.encode("systemTecho-faceid-v1");
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+async function prfToKey(out) {
+  const base = await crypto.subtle.importKey("raw", out, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: BIO_SALT, info: te.encode("wrap") }, base, { name: "AES-GCM", length: 256 }, false, ["wrapKey", "unwrapKey"]);
+}
+async function bioPrf(id) {
+  const a = await navigator.credentials.get({ publicKey: { challenge: rnd(32), rpId: location.hostname, allowCredentials: [{ type: "public-key", id }], userVerification: "required", timeout: 60000, extensions: { prf: { eval: { first: BIO_SALT } } } } });
+  const r = a.getClientExtensionResults().prf;
+  if (!r || !r.results || !r.results.first) throw new Error("NOPRF");
+  return r.results.first;
+}
+async function bioEnable() {
+  if (!window.PublicKeyCredential || !navigator.credentials) { await info("この端末・ブラウザでは顔認証が使えません。\n暗証番号で開いてください。"); return false; }
+  const pass = await askPass("今の暗証番号を入れてください", "Face IDを使う準備に必要です");
+  if (pass === null) return false;
+  busy("確認中…");
+  const meta = await dbGet("meta", "k"); let mk;
+  try { mk = await unwrapMaster(meta, pass, true); } catch (e) { busy(); toast("暗証番号が違います"); return false; }
+  busy();
+  try {
+    const c = await navigator.credentials.create({ publicKey: {
+      rp: { name: "システム手帳", id: location.hostname }, user: { id: rnd(16), name: "techo", displayName: "システム手帳" },
+      challenge: rnd(32), pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "required", userVerification: "required" },
+      timeout: 60000, extensions: { prf: { eval: { first: BIO_SALT } } } } });
+    const ext = c.getClientExtensionResults().prf;
+    if (!ext || ext.enabled === false) throw new Error("NOPRF");
+    const id = new Uint8Array(c.rawId);
+    let out = ext.results && ext.results.first;
+    if (!out) { await info("もう一度、Face IDで確認します"); out = await bioPrf(id); }
+    const k = await prfToKey(out), iv = rnd(12);
+    const ct = await crypto.subtle.wrapKey("raw", mk, k, { name: "AES-GCM", iv });
+    const m2 = await dbGet("meta", "k"); m2.bio = { id, iv, ct, at: Date.now() }; await dbPut("meta", "k", m2);
+    toast("Face IDで開けるようにしました 🙂", 3000); return true;
+  } catch (e) {
+    if (e && e.message === "NOPRF") await info("この端末では顔認証の鍵の仕組み（PRF）が使えませんでした。\niPhoneはiOS 18以降が必要です。暗証番号で開いてください。");
+    else if (e && e.name === "NotAllowedError") toast("取り消しました");
+    else await info("Face IDを設定できませんでした：" + (e && (e.message || e.name) || e));
+    return false;
+  }
+}
+async function bioUnlock() {
+  const meta = lockMeta || await dbGet("meta", "k");
+  if (!meta || !meta.bio) return;
+  const err = $("#lkErr");
+  try {
+    const out = await bioPrf(meta.bio.id);
+    err.textContent = "開いています…";
+    const k = await prfToKey(out);
+    S.key = await crypto.subtle.unwrapKey("raw", meta.bio.ct, k, { name: "AES-GCM", iv: meta.bio.iv }, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    fails = 0; await afterUnlock(false);
+  } catch (e) {
+    S.key = null;
+    if (e && e.name === "NotAllowedError") err.textContent = "";
+    else err.textContent = "顔認証で開けませんでした。暗証番号を入れてください";
+  }
+}
+let bioTried = false;
+function bioAuto() { if (bioTried || document.hidden) return; bioTried = true; bioUnlock(); }
+$("#lkBio").onclick = () => bioUnlock();
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !S.unlocked && lockMeta && lockMeta.bio && lockMode === "unlock") bioAuto(); });
 /* 旧版（暗証番号の鍵で直接暗号化していた版）からの自動移行 */
 async function migrateV1(meta, p) {
   const k1 = await pwKey(p, meta.salt, meta.iter, ["encrypt", "decrypt"]);
@@ -578,7 +657,7 @@ async function migrateV1(meta, p) {
     const master = await newMaster();
     const keys = await dbKeys(); const out = [];
     for (const k of keys) { const v = await dbGet("rec", k); if (v && v.iv) out.push([k, await encB(await decB(v, k1), master)]); }
-    const nm = await wrapMaster(master, p);
+    const nm = await wrapMaster(master, p); nm.plen = p.length;
     const d = await db();
     await new Promise((res, rej) => {
       const t = d.transaction(["meta", "rec"], "readwrite"); const rs = t.objectStore("rec");
@@ -1221,7 +1300,7 @@ function applyTheme() { const t = S.settings.theme; if (t === "auto") document.d
 function applySettingsUI() {
   $("#sIdle").value = String(S.settings.idleMin); $("#sHide").checked = S.settings.lockOnHide; $("#sSecretDef").checked = S.settings.secretDefault; $("#sTheme").value = S.settings.theme;
   $("#colorNames").innerHTML = S.settings.colorNames.map((n, i) => `<div class="colname"><i style="background:${COLORS[i]}"></i><input data-cn="${i}" value="${esc(n)}" maxlength="10"></div>`).join("");
-  renderCatEdit(); renderTagEdit();
+  renderCatEdit(); renderTagEdit(); bioUI();
   $("#bkLast").textContent = S.settings.lastBackup ? "前回の書き出し：" + new Date(S.settings.lastBackup).toLocaleString("ja-JP") : "まだ書き出していません";
 }
 $("#colorNames").addEventListener("change", async e => { const i = e.target.dataset.cn; if (i === undefined) return; S.settings.colorNames[+i] = e.target.value.trim() || "色" + (+i + 1); await saveSettings(); renderAll(); toast("色の名前を保存しました"); });
@@ -1276,6 +1355,12 @@ $("#tagEdit").addEventListener("click", async e => {
 $("#tagAdd").onclick = async () => { const v = normTag($("#tagNew").value); if (!v) return toast("タグを入れてください"); if (S.settings.tags.includes(v)) return toast("同じタグがあります"); S.settings.tags.push(v); $("#tagNew").value = ""; await saveSettings(); renderTagEdit(); toast("#" + v + " を追加しました"); };
 $("#sIdle").onchange = async e => { S.settings.idleMin = +e.target.value; await saveSettings(); toast("保存しました"); };
 $("#sHide").onchange = async e => { S.settings.lockOnHide = e.target.checked; await saveSettings(); };
+async function bioUI() { const m = await dbGet("meta", "k"); $("#sBio").checked = !!(m && m.bio); $("#sBioSub").textContent = m && m.bio ? "オン：開くときに顔を見せるだけ（暗証番号でも開けます）" : "暗証番号の代わりに顔で開きます"; }
+$("#sBio").onchange = async e => {
+  if (e.target.checked) { const ok = await bioEnable(); e.target.checked = ok; }
+  else { const m = await dbGet("meta", "k"); delete m.bio; await dbPut("meta", "k", m); toast("Face IDをやめました（暗証番号で開きます）"); }
+  bioUI();
+};
 $("#sSecretDef").onchange = async e => { S.settings.secretDefault = e.target.checked; await saveSettings(); };
 $("#sTheme").onchange = async e => { S.settings.theme = e.target.value; applyTheme(); await saveSettings(); };
 async function showUsage() { try { const e = await navigator.storage.estimate(); $("#sUsage").textContent = (e.usage / 1048576).toFixed(1) + " MB 使用中"; } catch (e) { $("#sUsage").textContent = "—"; } }
@@ -1297,7 +1382,8 @@ $("#sChangePass").onclick = () => {
     er.textContent = "確認中…";
     const meta = await dbGet("meta", "k"); let mk;
     try { mk = await unwrapMaster(meta, p0, true); } catch (x) { return er.textContent = "今の暗証番号が違います"; }
-    await dbPut("meta", "k", await wrapMaster(mk, p1));
+    const nm = await wrapMaster(mk, p1); nm.plen = p1.length; if (meta.bio) nm.bio = meta.bio;
+    await dbPut("meta", "k", nm);
     m.remove(); toast("暗証番号を変えました。バックアップも取り直してください", 4000);
   });
 };
@@ -1506,6 +1592,8 @@ const QA = [
   ["タグとカテゴリの違いは？", "<b>カテゴリ</b>＝1件に1つの大きな分類（見積もり・商談など）。<b>タグ</b>＝いくつでも付く細かい目印（会社名・製品・金型番号など）。組み合わせると一気に絞れます。"],
   ["写真・動画にタグを付けるには？", "写真・動画を入れた直後に「タグを付ける」画面が出ます。あとからでも、写真を押して大きく表示した画面の下で、タグとひと言メモを変えられます。"],
   ["動画はどのくらい入る？", "iPhoneの空き容量しだいです。1分の動画でおよそ50〜150MB。150MBを超えると確認が出ます（800MBまで）。長い動画は写真アプリで短く切ってから入れると軽くなります。"],
+  ["Face IDで開くには？", "「設定 → 🔐機密・ロック → Face ID（顔認証）で開く」をオンにして、今の暗証番号を入れ、Face IDを見せます。次から手帳を開くと自動でFace IDが出て、顔を見せるだけで開きます。<br>※iOS 18以降が必要です。PCやiPhoneごとに、それぞれの端末でオンにします。顔認証がうまくいかないときは、いつでも暗証番号で開けます。<br>※暗証番号を忘れた場合の保険にはなりません（バックアップを戻すときは暗証番号が必要です）。"],
+  ["暗証番号を入れたらすぐ開く？", "はい。決めた桁数まで入れた瞬間に、ボタンを押さなくても開きます（この版にしてから最初の1回だけは「開く」ボタンを押してください。そこで桁数を覚えます）。"],
   ["暗証番号を忘れたら？", "暗号の性質上、<b>誰にも開けられません</b>（作った人にも不可能です）。暗証番号は紙に書いて安全な所に保管してください。"],
   ["本当に他人に見られない？", "中身は全部 AES-256 で暗号化され、iPhoneの中だけに保存されます。ネットには送りません。席を立つときは右上の🔒を押してください。"],
   ["予定の時刻に鳴らすには？", "予定を開き「🔔呼び出し」で何分前かを選び、「📅 iPhoneのカレンダーに登録する」→ 出てきた画面で「追加」。手帳を閉じていても鳴ります。"],
