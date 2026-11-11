@@ -341,6 +341,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <h2>👁 表示</h2>
     <div class="row"><label>画面の明るさ</label><select id="sTheme"><option value="auto">iPhoneに合わせる</option><option value="light">明るい</option><option value="dark">暗い</option></select></div>
     <div class="row"><label>使用容量</label><span class="muted" id="sUsage">—</span></div>
+    <div class="row"><label>バージョン<span class="sub">直したあと、新しい版に変わったかをここで確かめます</span></label><span class="muted appver"></span></div>
   </section>
   <section class="card" id="cAbout" data-tabs="set">
     <h2>🛡 機密の守り方</h2>
@@ -423,6 +424,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
   <button class="btn" id="lkAbc" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);margin-top:8px;font-size:14px">英字も使う</button>
   <div class="err" id="lkErr"></div>
   <div class="small" id="lkSmall"></div>
+  <div class="small appver" style="margin-top:10px;opacity:.6"></div>
 </div>
 
 <div id="toast"></div>
@@ -433,6 +435,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const te = new TextEncoder(), td = new TextDecoder();
+const APP_VER = "2026.11.11-1"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
 const ITER = 600000;
 const CHUNK = 4 * 1024 * 1024;
 const DB_NAME = "systemTecho";
@@ -1759,6 +1762,7 @@ function showNotice() {
 })();
 
 /* ============ 起動 ============ */
+$$(".appver").forEach(el => { el.textContent = "Ver " + APP_VER; });
 if (!window.crypto?.subtle || !window.indexedDB) {
   $("#lkH").textContent = "この画面では使えません"; $("#lkP").textContent = "https のページ（GitHub Pages など）から開いてください。"; $("#lkGo").classList.add("hidden");
 } else { showTab("today"); initLock().catch(e => { $("#lkErr").textContent = "起動エラー：" + e.message; }); }
