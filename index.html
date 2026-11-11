@@ -397,8 +397,13 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <div class="fld"><span class="lb">📁 カテゴリ（見積もり・商談など）</span><div class="colors cats" id="edCats"></div></div>
     <div class="fld" id="fTagsEd"><span class="lb">🏷 タグ（何個でも・あとで探す目印）</span><div class="tp" id="edTags"></div></div>
     <div class="fld"><span class="lb">🎨 色</span><div class="colors" id="edColors"></div></div>
+    <div class="fld card hidden" id="fCard" style="padding:12px">
+      <span class="lb">🪪 名刺の内容を読み取る</span>
+      <textarea id="edCardTx" placeholder="① この枠を長押し →「テキストをスキャン」&#10;② 名刺にかざして「入力」&#10;③ 下のボタンを押す" style="min-height:96px" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <button class="btn wide pri" id="edCardGo" style="margin-top:8px">会社・名前・電話などに振り分ける</button>
+      <div class="hint">読み取りはiPhoneの機能がその場で行い、外には送りません。「テキストをスキャン」は「自動入力」の中にあることもあります。振り分けた結果は「相手」と「メモ」に入り、あとから直せます。</div>
+    </div>
     <div class="fld two"><div><label for="edP">場所</label><input id="edP" placeholder="例：本社 会議室"></div><div><label for="edW">相手</label><input id="edW" placeholder="例：P社 ○○様"></div></div>
-    <div class="hint hidden" id="cardHint" style="margin:-8px 0 14px">🪪 「相手」の欄を長押し →「テキストをスキャン」で、名刺の会社名・名前をiPhoneがその場で読み取って入れてくれます（外には送りません）。日付が違っていたら上の「日付」で直せます。</div>
     <div class="fld"><label for="edM">メモ</label><textarea id="edM" placeholder="内容・決まったこと・宿題など"></textarea></div>
     <div class="fld" id="fPhotos"><span class="lb">📷 写真・動画（押すと大きく見る・タグ付け）</span>
       <div class="photos" id="edPhotos"></div>
@@ -458,7 +463,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const te = new TextEncoder(), td = new TextDecoder();
-const APP_VER = "2026.11.11-3"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
+const APP_VER = "2026.11.11-4"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
 const ITER = 600000;
 const CHUNK = 4 * 1024 * 1024;
 const DB_NAME = "systemTecho";
@@ -1041,7 +1046,7 @@ function openEditor(e, isNew = false) {
   $("#edAll").checked = !!x.allDay; $("#edP").value = x.place || ""; $("#edW").value = x.who || ""; $("#edM").value = x.memo || "";
   $("#edR").value = String(x.remind ?? -1); $("#edSec").checked = !!x.secret; $("#edDone").checked = !!x.done;
   $("#edDel").classList.toggle("hidden", isNew);
-  $("#cardHint").classList.add("hidden");
+  $("#fCard").classList.toggle("hidden", !x.tags.includes("名刺")); $("#edCardTx").value = "";
   setKindUI(); renderEdColors(); renderEdMeta(); renderEdPhotos(); renderEdAudios(); timeUI();
   tagPicker($("#edTags"), ED.e.tags, () => { if (ED) ED.dirty = true; });
   $("#ed").classList.remove("hidden"); $("#ed").scrollTop = 0; document.body.style.overflow = "hidden";
@@ -1331,6 +1336,60 @@ async function storePhoto(f) {
   await putMedia(id, big); await putMedia(id + "_t", th);
   return { id, type: "photo", mime: "image/jpeg", at: Date.now(), tags: ["名刺"], cap: "名刺" };
 }
+/* 読み取った名刺の文字を、会社・部署役職・名前・電話・メール・住所などに振り分ける */
+function parseCard(raw) {
+  const r = { co: "", dept: [], name: "", tel: [], mob: [], fax: [], mail: [], url: [], addr: [], etc: [] };
+  const KJ = /^[\u3040-\u30ff\u3400-\u9fff々ヶ ]+$/;
+  const CO = /株式会社|有限会社|合同会社|合資会社|\(株\)|\(有\)|協同組合|法人|Co\.|Inc\b|Ltd\b|Corp\b|K\.K\./i;
+  const TI = /取締役|代表|社長|会長|専務|常務|役員|部長|課長|係長|室長|所長|工場長|店長|次長|班長|主任|主査|主幹|担当|顧問|マネージャ|リーダー|チーフ|エンジニア|[^\s]{2,}(部|課|室|係|グループ|センター|営業所|支店|支社|工場|本部)( |$)|Manager|Director|President|CEO|Dept|Division/i;
+  const AD = /〒|(東京都|北海道|京都府|大阪府|.{2,3}県).*(市|区|町|村|郡)/, AD2 = /丁目|番地|番町|ビル|\d+(F|階)|\d+-\d+/;
+  const PH = /(TEL|電話|FAX|携帯|MOBILE|PHONE|直通|[TFM])?\s*[:：.\/]?\s*\(?(0\d{1,4})\)?[-‐–—−ー\s.]?\(?(\d{1,4})\)?[-‐–—−ー\s.]?(\d{3,4})(?!\d)/gi;
+  const push = (a, v) => { if (v && !a.includes(v)) a.push(v); };
+  for (let line of String(raw || "").normalize("NFKC").split(/\n+/)) {
+    line = line.replace(/\s+/g, " ").trim(); if (!line) continue;
+    line = line.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, m => { push(r.mail, m); return " "; });
+    line = line.replace(/(https?:\/\/|www\.)[^\s]+|[\w-]+(\.[\w-]+)*\.(co\.jp|ne\.jp|or\.jp|jp|com|net|org)(\/[^\s]*)?/gi, m => { push(r.url, m); return " "; });
+    const isAd = AD.test(line);
+    line = line.replace(PH, (m, lab, a, b, c) => {
+      const n = (a + b + c).length; if (n < 10 || n > 11 || (isAd && !lab)) return m;
+      const L = (lab || "").toUpperCase(), num = a + "-" + b + "-" + c;
+      push(L === "F" || L === "FAX" ? r.fax : (L === "M" || L === "携帯" || L === "MOBILE" || /^0[789]0$/.test(a)) ? r.mob : r.tel, num); return " ";
+    });
+    line = line.replace(/(TEL|FAX|E-?MAIL|MAIL|URL|HP|携帯|電話|直通|MOBILE|PHONE)\s*[:：.]?/gi, " ").replace(/\s+/g, " ").replace(/^[\s:：\/|,・]+|[\s:：\/|,・]+$/g, "");
+    if (!line) continue;
+    if (isAd || (r.addr.length && AD2.test(line) && !CO.test(line))) { r.addr.push(line); continue; }
+    if (CO.test(line)) { if (!r.co) r.co = line; else r.etc.push(line); continue; }
+    const tk = line.split(" ");
+    if (!r.name && tk.length === 2 && KJ.test(line) && tk.every(t => t.length <= 4 && !(t.length >= 3 && /[部課室係所]$/.test(t))) && !TI.test(line.replace(/[^\s]{2,}(部|課|室|係)( |$)/, ""))) { r.name = line; continue; }
+    if (TI.test(line)) {
+      let last = -1; tk.forEach((t, i) => { if (TI.test(t + " ")) last = i; });
+      const tail = tk.slice(last + 1).join(" ");
+      if (!r.name && last >= 0 && tail && KJ.test(tail) && tail.length >= 2 && tail.length <= 9) { r.name = tail; r.dept.push(tk.slice(0, last + 1).join(" ")); }
+      else r.dept.push(line);
+      continue;
+    }
+    r.etc.push(line);
+  }
+  if (!r.name) { const i = r.etc.findIndex(l => KJ.test(l) && l.replace(/ /g, "").length >= 2 && l.replace(/ /g, "").length <= 7); if (i >= 0) r.name = r.etc.splice(i, 1)[0]; }
+  return r;
+}
+$("#edCardGo").onclick = () => {
+  if (!ED) return;
+  const raw = $("#edCardTx").value.trim();
+  if (!raw) return toast("先に上の枠を長押し →「テキストをスキャン」で名刺を読み取ってください", 4000);
+  const r = parseCard(raw);
+  const rows = [["会社", r.co], ["部署・役職", r.dept.join(" ／ ")], ["名前", r.name], ["電話", r.tel.join("、")], ["携帯", r.mob.join("、")], ["FAX", r.fax.join("、")], ["メール", r.mail.join("、")], ["住所", r.addr.join(" ")], ["URL", r.url.join("、")], ["その他", r.etc.join(" ／ ")]].filter(x => x[1]);
+  const block = rows.map(x => x[0] + "：" + x[1]).join("\n");
+  const old = $("#edM").value.trim();
+  $("#edM").value = block + (old ? "\n\n" + old : "");
+  const who = [r.co, r.name].filter(Boolean).join(" ");
+  if (who) $("#edW").value = who;
+  const t = $("#edT").value.trim();
+  if ((!t || t === "名刺交換") && (r.co || r.name)) $("#edT").value = "名刺交換 " + (r.co || r.name);
+  $("#edCardTx").value = ""; ED.dirty = true;
+  toast("振り分けました。「相手」と「メモ」を見て、違うところは直してください", 4000);
+  $("#edW").scrollIntoView({ block: "center" });
+};
 function cardEntry(d) {
   const e = newEntry("note", d ? d.date : null);
   if (d) e.start = d.time;
@@ -1352,9 +1411,8 @@ $("#cardIn").addEventListener("change", async ev => {
       try { const m = await storePhoto(f); if (ED) { ED.e.photos.push(m); ED.added.push(m.id); ED.dirty = true; } else await delMedia(m.id); }
       catch (x) { busy(); closeEditor(); toast("この写真は読み込めませんでした"); return; }
       learnTags(["名刺"]); renderEdPhotos();
-      $("#cardHint").classList.remove("hidden");
       busy();
-      toast(d ? "撮った日 " + fmtDay(d.date) + " の記録にしました。会社名・名前を入れて保存してください" : "写真に撮影日が入っていなかったので、今日の日付にしています。違う場合は日付を直してください", 5000);
+      toast(d ? "撮った日 " + fmtDay(d.date) + " の記録にしました。「名刺の内容を読み取る」で会社名・名前を入れられます" : "写真に撮影日が入っていなかったので、今日の日付にしています。違う場合は日付を直してください", 5000);
       return;
     }
     let i = 0;
@@ -1795,7 +1853,7 @@ const QA = [
   ["動画はどのくらい入る？", "iPhoneの空き容量しだいです。1分の動画でおよそ50〜150MB。150MBを超えると確認が出ます（800MBまで）。長い動画は写真アプリで短く切ってから入れると軽くなります。"],
   ["Face IDで開くには？", "「設定 → 🔐機密・ロック → Face ID（顔認証）で開く」をオンにして、今の暗証番号を入れ、Face IDを見せます。次から手帳を開くと自動でFace IDが出て、顔を見せるだけで開きます。<br>※iOS 18以降が必要です。PCやiPhoneごとに、それぞれの端末でオンにします。顔認証がうまくいかないときは、いつでも暗証番号で開けます。<br>※暗証番号を忘れた場合の保険にはなりません（バックアップを戻すときは暗証番号が必要です）。"],
   ["暗証番号を入れたらすぐ開く？", "はい。決めた桁数まで入れた瞬間に、ボタンを押さなくても開きます（この版にしてから最初の1回だけは「開く」ボタンを押してください。そこで桁数を覚えます）。"],
-  ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>会社名・名前は、「相手」の欄を長押し →「テキストをスキャン」で、iPhoneが名刺の文字をその場で読み取って入れてくれます。<br>すべてiPhoneの中だけで行い、外には送りません。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
+  ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>名刺の内容は、編集画面の「🪪名刺の内容を読み取る」の枠を長押し →「テキストをスキャン」→ 名刺にかざして「入力」→「振り分ける」ボタン。会社・部署役職・名前・電話・携帯・FAX・メール・住所に自動で分けて、「相手」と「メモ」に入れます（違うところは直せます）。<br>すべてiPhoneの中だけで行い、外には送りません。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
   ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開き、「＋追加」でサイト名・ID・PASSを入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>予定や写真と同じく暗号化して保存され、バックアップ・PCとの合体にも入ります。<br>※大事なPASSを入れるなら、手帳の暗証番号は<b>英字まじりの長め</b>にしてください。"],
   ["暗証番号を忘れたら？", "暗号の性質上、<b>誰にも開けられません</b>（作った人にも不可能です）。暗証番号は紙に書いて安全な所に保管してください。"],
   ["本当に他人に見られない？", "中身は全部 AES-256 で暗号化され、iPhoneの中だけに保存されます。ネットには送りません。席を立つときは右上の🔒を押してください。"],
