@@ -53,8 +53,8 @@ nav.bottom button{flex:1;background:none;border:0;display:flex;flex-direction:co
 nav.bottom button .ic{font-size:21px;line-height:1}
 nav.bottom button.on{color:var(--accent);font-weight:700}
 nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin-top:-18px;box-shadow:0 4px 12px rgba(0,0,0,.25)}
-.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.quick button{background:var(--accent-soft);border:0;border-radius:12px;padding:10px 4px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);min-height:64px}
+.quick{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.quick button{background:var(--accent-soft);border:0;border-radius:12px;padding:10px 2px;font-size:11px;white-space:nowrap;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);min-height:64px}
 .quick button .ic{font-size:22px}
 .item{display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);align-items:stretch;cursor:pointer}
 .item:last-child{border-bottom:0}
@@ -243,6 +243,15 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 #notice{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom));z-index:40;background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 #notice button{background:rgba(255,255,255,.2);border:0;border-radius:8px;padding:6px 10px;color:inherit}
 #busy{position:fixed;inset:0;z-index:130;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;text-align:center;padding:30px;white-space:pre-line}
+.pwi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px}
+.pwi .pwh{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.pwi .pwh b{flex:1;min-width:0;word-break:break-all}
+.pwi .pwl{display:flex;align-items:center;gap:6px;padding:4px 0}
+.pwi .pwl .k{flex:none;width:42px;font-size:12px;color:var(--sub)}
+.pwi .pwl .v{flex:1;min-width:0;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;user-select:text;-webkit-user-select:text}
+.pwi button{flex:none;border:1px solid var(--line);background:var(--surface2);border-radius:8px;height:36px;min-width:44px;padding:0 10px;font-size:13px}
+.pwi button.cp{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.pwi .pwm{font-size:13px;color:var(--sub);white-space:pre-wrap;word-break:break-all;margin-top:2px}
 .muted{color:var(--sub);font-size:13px}
 .sec{font-size:13px;color:var(--sub);line-height:1.6}
 .sec b{color:var(--ink)}
@@ -253,6 +262,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 <header class="top">
   <h1>システム手帳<span class="hdate" id="hdate"></span></h1>
   <button class="iconbtn" id="btnFind" aria-label="探す">🔍</button>
+  <button class="iconbtn" id="btnPw" aria-label="PASS帳">🔑</button>
   <button class="iconbtn" id="btnHelp" aria-label="使い方">？</button>
   <button class="iconbtn" id="btnLock" aria-label="ロック">🔒</button>
 </header>
@@ -265,7 +275,9 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
       <button id="qPhoto"><span class="ic">📷</span>写真・動画</button>
       <button id="qRec"><span class="ic">🎙</span>録音メモ</button>
       <button id="qNote"><span class="ic">✎</span>書くメモ</button>
+      <button id="qCard"><span class="ic">🪪</span>名刺</button>
     </div>
+    <input type="file" id="cardIn" accept="image/*" multiple class="hidden">
   </section>
   <section class="card" id="cToday" data-tabs="today"><h2 id="todayTitle">今日</h2><div id="todayList"></div></section>
   <section class="card" id="cWeek" data-tabs="today"><h2>これから7日間</h2><div id="weekList"></div></section>
@@ -386,6 +398,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <div class="fld" id="fTagsEd"><span class="lb">🏷 タグ（何個でも・あとで探す目印）</span><div class="tp" id="edTags"></div></div>
     <div class="fld"><span class="lb">🎨 色</span><div class="colors" id="edColors"></div></div>
     <div class="fld two"><div><label for="edP">場所</label><input id="edP" placeholder="例：本社 会議室"></div><div><label for="edW">相手</label><input id="edW" placeholder="例：P社 ○○様"></div></div>
+    <div class="hint hidden" id="cardHint" style="margin:-8px 0 14px">🪪 「相手」の欄を長押し →「テキストをスキャン」で、名刺の会社名・名前をiPhoneがその場で読み取って入れてくれます（外には送りません）。日付が違っていたら上の「日付」で直せます。</div>
     <div class="fld"><label for="edM">メモ</label><textarea id="edM" placeholder="内容・決まったこと・宿題など"></textarea></div>
     <div class="fld" id="fPhotos"><span class="lb">📷 写真・動画（押すと大きく見る・タグ付け）</span>
       <div class="photos" id="edPhotos"></div>
@@ -413,6 +426,16 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
   </div>
 </div>
 
+<div class="sheet hidden" id="pw">
+  <div class="shead"><button id="pwClose">閉じる</button><h3>🔑 PASS帳</h3><button id="pwAdd">＋追加</button></div>
+  <div class="sbody">
+    <input id="pwQ" type="search" placeholder="🔍 サイト名・IDで探す" autocomplete="off">
+    <div class="muted" id="pwCount" style="margin-top:8px"></div>
+    <div id="pwList"></div>
+    <div class="hint" style="margin-top:14px">「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」で貼れます。中身は予定や写真と同じく暗号化して、この端末の中だけに保存します。</div>
+  </div>
+</div>
+
 <div id="lock">
   <div class="lk">🔒</div>
   <h2 id="lkH">システム手帳</h2>
@@ -435,7 +458,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const te = new TextEncoder(), td = new TextDecoder();
-const APP_VER = "2026.11.11-1"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
+const APP_VER = "2026.11.11-3"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
 const ITER = 600000;
 const CHUNK = 4 * 1024 * 1024;
 const DB_NAME = "systemTecho";
@@ -447,7 +470,7 @@ const DEF_SETTINGS = {
   tags: ["見積","図面","金型","単価","納期","不良","議事録","宿題","現場","製品","設備","請求","契約","ホワイトボード","名刺"]
 };
 const F0 = () => ({ kind: "all", mtype: "all", cat: "", rank: 0, color: -1, tags: [], period: "all", from: "", to: "", wds: [], sort: "new" });
-const S = { key: null, entries: new Map(), settings: structuredClone(DEF_SETTINGS), tab: "today", calMonth: null, selDay: null, F: F0(), urls: new Map(), unlocked: false, moreOpen: false, busy: false };
+const S = { key: null, entries: new Map(), pw: new Map(), settings: structuredClone(DEF_SETTINGS), tab: "today", calMonth: null, selDay: null, F: F0(), urls: new Map(), unlocked: false, moreOpen: false, busy: false };
 const pad = n => String(n).padStart(2, "0");
 const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 const parseYmd = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -680,6 +703,7 @@ async function afterUnlock(first) {
   if (!Array.isArray(S.settings.tags)) S.settings.tags = structuredClone(DEF_SETTINGS.tags);
   const rows = await dbRange("e:", "e:\uffff");
   for (const r of rows) { try { const e = fixEntry(await decJ(r)); S.entries.set(e.id, e); } catch (e) {} }
+  await loadPw();
   S.unlocked = true; lastAct = Date.now();
   if (lockMode === "restore") toast("バックアップを読み込みました");
   lockMode = "unlock";
@@ -705,6 +729,7 @@ async function lock(reason) {
     else if (!$("#ed").classList.contains("hidden")) closeEditor();
   } catch (e) {}
   endTour(); closeSheets();
+  closePw(); S.pw.clear();
   S.key = null; S.entries.clear(); S.unlocked = false;
   for (const u of S.urls.values()) URL.revokeObjectURL(u); S.urls.clear();
   ["#todayList", "#weekList", "#recentList", "#dayList", "#allList", "#mediaList", "#edPhotos", "#edAudios"].forEach(s => $(s).innerHTML = "");
@@ -968,7 +993,7 @@ function showTab(t) {
 }
 $$("nav.bottom button[data-t]").forEach(b => b.onclick = () => showTab(b.dataset.t));
 document.addEventListener("click", e => {
-  if (e.target.closest("#ed") || e.target.closest("#viewer") || e.target.closest(".bsheet") || e.target.closest(".modal")) return;
+  if (e.target.closest("#pw") || e.target.closest("#ed") || e.target.closest("#viewer") || e.target.closest(".bsheet") || e.target.closest(".modal")) return;
   const it = e.target.closest(".item[data-id]"); if (it && S.entries.has(it.dataset.id)) { openEditor(S.entries.get(it.dataset.id)); return; }
   const mt = e.target.closest(".mt[data-p]"); if (mt) { const en = S.entries.get(mt.dataset.e); const p = en?.photos.find(x => x.id === mt.dataset.p); if (p) openViewer(p, en, false); return; }
   const d = e.target.closest("#calGrid .d[data-d]"); if (d) { S.selDay = d.dataset.d; const dd = parseYmd(S.selDay); if (dd.getMonth() !== S.calMonth.getMonth()) S.calMonth = new Date(dd.getFullYear(), dd.getMonth(), 1); renderCal(); return; }
@@ -1016,6 +1041,7 @@ function openEditor(e, isNew = false) {
   $("#edAll").checked = !!x.allDay; $("#edP").value = x.place || ""; $("#edW").value = x.who || ""; $("#edM").value = x.memo || "";
   $("#edR").value = String(x.remind ?? -1); $("#edSec").checked = !!x.secret; $("#edDone").checked = !!x.done;
   $("#edDel").classList.toggle("hidden", isNew);
+  $("#cardHint").classList.add("hidden");
   setKindUI(); renderEdColors(); renderEdMeta(); renderEdPhotos(); renderEdAudios(); timeUI();
   tagPicker($("#edTags"), ED.e.tags, () => { if (ED) ED.dirty = true; });
   $("#ed").classList.remove("hidden"); $("#ed").scrollTop = 0; document.body.style.overflow = "hidden";
@@ -1263,6 +1289,162 @@ $("#edAudios").addEventListener("click", async e => {
     if (!await ask("この録音を消しますか？", "消す", "やめる", true)) return;
     ED.e.audios = ED.e.audios.filter(x => x.id !== id); ED.removed.push(id); ED.dirty = true; renderEdAudios();
   }
+});
+
+/* ============ 名刺（撮った日を写真から読み取り、その日の記録にする） ============
+   写真の中に入っている撮影日時（Exif）を、この端末の中だけで読む。外には送らない。 */
+async function photoDate(f) {
+  try {
+    const u = new Uint8Array(await f.slice(0, 512 * 1024).arrayBuffer()), dv = new DataView(u.buffer);
+    const txt = at => { let t = ""; for (let i = 0; i < 19; i++) t += String.fromCharCode(u[at + i]); return t; };
+    const mk = t => { const m = /^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)$/.exec(t); if (!m || +m[1] < 1990 || +m[2] < 1 || +m[2] > 12 || +m[3] < 1 || +m[3] > 31) return null; return { date: m[1] + "-" + m[2] + "-" + m[3], time: m[4] + ":" + m[5] }; };
+    /* JPEG：Exifの「撮影日時」を正しく探す */
+    if (u[0] === 0xFF && u[1] === 0xD8) {
+      let p = 2;
+      while (p + 4 < u.length && u[p] === 0xFF) {
+        const mkr = u[p + 1], len = dv.getUint16(p + 2);
+        if (mkr === 0xE1 && txt(p + 4).startsWith("Exif")) {
+          const t0 = p + 10, le = dv.getUint16(t0) === 0x4949;
+          const u16 = o => dv.getUint16(t0 + o, le), u32 = o => dv.getUint32(t0 + o, le);
+          const ifd = (off, want) => { const n = u16(off), out = {}; for (let i = 0; i < n; i++) { const e = off + 2 + i * 12, tag = u16(e); if (want.includes(tag)) out[tag] = u32(e + 8); } return out; };
+          const i0 = ifd(u32(4), [0x8769, 0x0132]);
+          if (i0[0x8769]) { const ex = ifd(i0[0x8769], [0x9003, 0x9004]); for (const tg of [0x9003, 0x9004]) if (ex[tg]) { const r = mk(txt(t0 + ex[tg])); if (r) return r; } }
+          if (i0[0x0132]) { const r = mk(txt(t0 + i0[0x0132])); if (r) return r; }
+          break;
+        }
+        if (mkr === 0xDA) break;
+        p += 2 + len;
+      }
+    }
+    /* それ以外（HEICなど）：日時の形をした文字を探す */
+    for (let i = 0; i + 19 <= u.length; i++) {
+      if (u[i + 4] !== 0x3A || u[i + 7] !== 0x3A || u[i + 10] !== 0x20 || u[i + 13] !== 0x3A || u[i + 16] !== 0x3A) continue;
+      const r = mk(txt(i)); if (r) return r;
+    }
+  } catch (e) {}
+  return null;
+}
+async function storePhoto(f) {
+  const img = await loadImg(f);
+  const big = await resizeTo(img, 2000, 0.85), th = await resizeTo(img, 320, 0.7);
+  const id = uid();
+  await putMedia(id, big); await putMedia(id + "_t", th);
+  return { id, type: "photo", mime: "image/jpeg", at: Date.now(), tags: ["名刺"], cap: "名刺" };
+}
+function cardEntry(d) {
+  const e = newEntry("note", d ? d.date : null);
+  if (d) e.start = d.time;
+  e.title = "名刺交換"; e.color = 1; e.tags = ["名刺"];
+  const c = (S.settings.cats || []).find(x => /商談|営業/.test(x[1])); if (c) e.cat = c[0];
+  return e;
+}
+$("#qCard").onclick = () => { pickerOpen = true; $("#cardIn").value = ""; $("#cardIn").click(); };
+$("#cardIn").addEventListener("change", async ev => {
+  pickerOpen = false;
+  const files = [...ev.target.files].filter(f => !(f.type || "").startsWith("video")); if (!files.length || !S.unlocked) return;
+  if (files.length > 1 && !await ask("名刺 " + files.length + "枚を、それぞれ撮った日の記録として1件ずつ登録します。\n会社名・名前はあとで各記録を開いて入れられます。", "登録する", "やめる")) return;
+  S.busy = true; busy("名刺を読み取って保存中…");
+  let nodate = 0, fail = 0; const days = new Set();
+  try {
+    if (files.length === 1) {
+      const f = files[0], d = await photoDate(f), e = cardEntry(d);
+      openEditor(e, true);
+      try { const m = await storePhoto(f); if (ED) { ED.e.photos.push(m); ED.added.push(m.id); ED.dirty = true; } else await delMedia(m.id); }
+      catch (x) { busy(); closeEditor(); toast("この写真は読み込めませんでした"); return; }
+      learnTags(["名刺"]); renderEdPhotos();
+      $("#cardHint").classList.remove("hidden");
+      busy();
+      toast(d ? "撮った日 " + fmtDay(d.date) + " の記録にしました。会社名・名前を入れて保存してください" : "写真に撮影日が入っていなかったので、今日の日付にしています。違う場合は日付を直してください", 5000);
+      return;
+    }
+    let i = 0;
+    for (const f of files) {
+      busy("名刺を読み取って保存中… " + (++i) + "/" + files.length);
+      try {
+        const d = await photoDate(f), e = cardEntry(d); if (!d) nodate++;
+        e.photos = [await storePhoto(f)]; await putEntry(e); days.add(e.date);
+      } catch (x) { fail++; }
+    }
+    learnTags(["名刺"]);
+  } finally { busy(); S.busy = false; lastAct = Date.now(); }
+  renderAll();
+  await info("名刺 " + (files.length - fail) + "枚を登録しました ✓\n\n入れた日：" + [...days].sort().map(fmtDay).join("、") + (nodate ? "\n\n※" + nodate + "枚は写真に撮影日が入っていなかったので、今日の日付にしています。" : "") + (fail ? "\n※" + fail + "枚は読み込めませんでした。" : "") + "\n\n「🖼写真」や「一覧」で #名刺 を押すとまとめて見られます。");
+});
+
+/* ============ PASS帳（各サイトのID・パスワード） ============
+   1件ずつ暗号化して "p:"＋番号 で保存。消した記録は "q:"＋番号（合体のとき他の端末でも消すため）。 */
+const pwShown = new Set();
+async function loadPw() {
+  S.pw.clear();
+  for (const r of await dbRange("p:", "p:\uffff")) { try { const x = await decJ(r); S.pw.set(x.id, x); } catch (e) {} }
+}
+function openPw() { if (!S.unlocked) return; pwShown.clear(); $("#pwQ").value = ""; renderPw(); $("#pw").classList.remove("hidden"); $("#pw").scrollTop = 0; document.body.style.overflow = "hidden"; }
+function closePw() { pwShown.clear(); $("#pwList").innerHTML = ""; $("#pwQ").value = ""; $("#pw").classList.add("hidden"); if ($("#ed").classList.contains("hidden")) document.body.style.overflow = ""; }
+function renderPw() {
+  const ws = $("#pwQ").value.trim().toLowerCase().split(/[\s　]+/).filter(Boolean);
+  const arr = [...S.pw.values()].filter(x => { const hay = [x.site, x.url, x.user, x.memo].join(" ").toLowerCase(); return ws.every(w => hay.includes(w)); })
+    .sort((a, b) => (a.site || "").localeCompare(b.site || "", "ja"));
+  $("#pwCount").textContent = S.pw.size ? arr.length + "件" + (ws.length ? "（絞り込み中）" : "") : "";
+  $("#pwList").innerHTML = arr.length ? arr.map(x => `<div class="pwi" data-id="${x.id}">
+    <div class="pwh"><b>${esc(x.site || "（無題）")}</b><button data-a="ed">✎ 直す</button></div>
+    ${x.url ? `<div class="pwl"><span class="k">URL</span><span class="v" style="font-size:13px">${esc(x.url)}</span><button data-a="cl">コピー</button></div>` : ""}
+    <div class="pwl"><span class="k">ID</span><span class="v">${esc(x.user || "")}</span><button class="cp" data-a="cu">コピー</button></div>
+    <div class="pwl"><span class="k">PASS</span><span class="v">${pwShown.has(x.id) ? esc(x.pass || "") : "•".repeat(Math.min(12, Math.max(6, (x.pass || "").length)))}</span><button data-a="sh">${pwShown.has(x.id) ? "隠す" : "見る"}</button><button class="cp" data-a="cp">コピー</button></div>
+    ${x.memo ? `<div class="pwm">${esc(x.memo)}</div>` : ""}</div>`).join("")
+    : `<div class="empty" style="margin-top:10px">${S.pw.size ? "見つかりません" : "まだ何も入っていません。右上の「＋追加」から入れられます"}</div>`;
+}
+async function copyText(t, what) {
+  if (!t) return toast(what + "が入っていません");
+  let ok = false;
+  try { await navigator.clipboard.writeText(t); ok = true; } catch (e) {}
+  if (!ok) { try { const ta = document.createElement("textarea"); ta.value = t; ta.style.cssText = "position:fixed;left:0;top:0;opacity:0"; document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, t.length); ok = document.execCommand("copy"); ta.remove(); } catch (e) {} }
+  toast(ok ? what + "をコピーしました" : "コピーできませんでした。「見る」で表示して手で写してください", ok ? 1800 : 4000);
+}
+function genPass(n = 16) {
+  const cs = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"; let out = "";
+  while (out.length < n) { const b = rnd(1)[0]; if (b < 224) out += cs[b % cs.length]; }
+  return out;
+}
+function editPw(x) {
+  closeSheets();
+  const isNew = !x; x = x || { id: uid(), site: "", url: "", user: "", pass: "", memo: "", created: Date.now() };
+  const b = document.createElement("div"); b.className = "bsheet";
+  const at = 'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"';
+  b.innerHTML = `<div class="panel"><h3>${isNew ? "PASSを追加" : "PASSを直す"}<button data-x>✕</button></h3>
+    <div class="fld"><label>サイト・サービスの名前</label><input id="pfSite" placeholder="例：○○銀行 法人ネットバンク" autocomplete="off" value="${esc(x.site)}"></div>
+    <div class="fld"><label>アドレス（URL・なくてもよい）</label><input id="pfUrl" placeholder="https://…" inputmode="url" ${at} value="${esc(x.url)}"></div>
+    <div class="fld"><label>ID（ユーザー名・メールアドレス）</label><input id="pfUser" ${at} value="${esc(x.user)}"></div>
+    <div class="fld"><label>PASS（パスワード）</label><div style="display:flex;gap:6px"><input id="pfPass" ${at} style="flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace" value="${esc(x.pass)}"><button class="btn sm" id="pfGen">自動で作る</button></div></div>
+    <div class="fld"><label>メモ（秘密の質問・契約番号など）</label><textarea id="pfMemo" style="min-height:70px">${esc(x.memo)}</textarea></div>
+    <div class="btns">${isNew ? "" : `<button class="btn dng" id="pfDel" style="flex:none">削除</button>`}<button class="btn" data-x>やめる</button><button class="btn pri" id="pfOk">保存する</button></div></div>`;
+  document.body.appendChild(b);
+  b.addEventListener("click", e => { if (e.target.closest("[data-x]")) b.remove(); });
+  b.querySelector("#pfGen").onclick = async () => { const i = b.querySelector("#pfPass"); if (i.value && !await ask("今入っているPASSを、新しく作ったものに入れ替えますか？", "入れ替える", "やめる")) return; i.value = genPass(); };
+  b.querySelector("#pfOk").onclick = async () => {
+    const g = id => b.querySelector(id).value;
+    Object.assign(x, { site: g("#pfSite").trim(), url: g("#pfUrl").trim(), user: g("#pfUser").trim(), pass: g("#pfPass"), memo: g("#pfMemo").trim(), updated: Date.now() });
+    if (!x.site && !x.user && !x.pass) return toast("名前かID・PASSを入れてください");
+    if (!x.site) x.site = x.url || x.user;
+    S.pw.set(x.id, x); await dbPut("rec", "p:" + x.id, await encJ(x));
+    b.remove(); renderPw(); toast("保存しました");
+  };
+  if (!isNew) b.querySelector("#pfDel").onclick = async () => {
+    if (!await ask("「" + (x.site || "無題") + "」のPASSを削除しますか？", "削除する", "やめる", true)) return;
+    await removePw(x.id); b.remove(); renderPw(); toast("削除しました");
+  };
+}
+async function removePw(id, t) { S.pw.delete(id); pwShown.delete(id); await dbDel("rec", "p:" + id); await dbPut("rec", "q:" + id, await encJ({ id, t: t || Date.now() })); }
+$("#btnPw").onclick = openPw;
+$("#pwClose").onclick = closePw;
+$("#pwAdd").onclick = () => editPw(null);
+$("#pwQ").addEventListener("input", renderPw);
+$("#pwList").addEventListener("click", e => {
+  const bt = e.target.closest("button[data-a]"); if (!bt) return;
+  const x = S.pw.get(bt.closest(".pwi").dataset.id); if (!x) return;
+  const a = bt.dataset.a;
+  if (a === "cp") copyText(x.pass, "PASS"); else if (a === "cu") copyText(x.user, "ID"); else if (a === "cl") copyText(x.url, "URL");
+  else if (a === "sh") { pwShown.has(x.id) ? pwShown.delete(x.id) : pwShown.add(x.id); renderPw(); }
+  else if (a === "ed") editPw(x);
 });
 
 /* カレンダー登録（.ics） */
@@ -1513,16 +1695,18 @@ async function mergeImport(f, head) {
   }
   if (!bk) { toast("暗証番号が違うため、読み込みをやめました", 3500); return; }
   S.busy = true;
-  const st = { add: 0, upd: 0, del: 0, same: 0, media: 0, lost: 0 };
+  const st = { add: 0, upd: 0, del: 0, same: 0, media: 0, lost: 0, pw: 0 };
   try {
     busy("バックアップを調べています…");
     /* 1回目：中身の一覧と、予定・記録・削除の記録を読む */
-    const inKeys = new Set(), inE = new Map(), inX = new Map(); let inS = null, first = true;
+    const inKeys = new Set(), inE = new Map(), inX = new Map(), inP = new Map(), inQ = new Map(); let inS = null, first = true;
     for await (const ln of fileLines(f)) {
       if (first) { first = false; continue; }
       const r = JSON.parse(ln), k = r[0]; inKeys.add(k);
       if (k.startsWith("e:")) inE.set(k.slice(2), fixEntry(await decJ(recOf(r), bk)));
       else if (k.startsWith("x:")) inX.set(k.slice(2), await decJ(recOf(r), bk));
+      else if (k.startsWith("p:")) inP.set(k.slice(2), await decJ(recOf(r), bk));
+      else if (k.startsWith("q:")) inQ.set(k.slice(2), await decJ(recOf(r), bk));
       else if (k === "s") { try { inS = await decJ(recOf(r), bk); } catch (e) {} }
     }
     const locKeys = new Set(await dbKeys()), locX = new Map();
@@ -1568,6 +1752,20 @@ async function mergeImport(f, head) {
     for (const id of dropMedia) await delMedia(id);
     for (const [le, t] of toDel) { await removeEntry(le, t); st.del++; }
     for (const x of newTombs) await dbPut("rec", "x:" + x.id, await encJ(x));
+    /* PASS帳も同じ決まりで合体（後から直した方を残す・消した物は消えたまま） */
+    const locQ = new Map();
+    for (const r of await dbRange("q:", "q:\uffff")) { try { const x = await decJ(r); locQ.set(x.id, x); } catch (e) {} }
+    for (const [id, ip] of inP) {
+      const lp = S.pw.get(id), lq = locQ.get(id);
+      if (lq && lq.t >= (ip.updated || 0)) continue;
+      if (lp && (ip.updated || 0) <= (lp.updated || 0)) continue;
+      S.pw.set(id, ip); await dbPut("rec", "p:" + id, await encJ(ip)); st.pw++;
+    }
+    for (const [id, iq] of inQ) {
+      const lp = S.pw.get(id), lq = locQ.get(id);
+      if (lp && iq.t > (lp.updated || 0)) { await removePw(id, iq.t); st.pw++; }
+      else if (!lp && (!lq || lq.t < iq.t)) await dbPut("rec", "q:" + id, await encJ(iq));
+    }
     if (inS) {
       const s = S.settings;
       for (const t of inS.tags || []) if (!s.tags.includes(t)) s.tags.push(t);
@@ -1578,7 +1776,7 @@ async function mergeImport(f, head) {
   } catch (e) { busy(); S.busy = false; toast("合体に失敗しました：" + (e.message || e), 5000); return; }
   busy(); S.busy = false;
   applySettingsUI(); renderAll();
-  await info("合体しました ✓\n\n追加：" + st.add + "件\n更新：" + st.upd + "件\n削除：" + st.del + "件\n変わらず：" + st.same + "件\n写真・動画・録音の取り込み：" + st.media + "件" + (st.lost ? "\n\n※文字だけのバックアップのため、写真等" + st.lost + "件は入っていません" : ""));
+  await info("合体しました ✓\n\n追加：" + st.add + "件\n更新：" + st.upd + "件\n削除：" + st.del + "件\n変わらず：" + st.same + "件\n写真・動画・録音の取り込み：" + st.media + "件\nPASS帳の反映：" + st.pw + "件" + (st.lost ? "\n\n※文字だけのバックアップのため、写真等" + st.lost + "件は入っていません" : ""));
 }
 $("#sWipe").onclick = async () => {
   if (!await ask("手帳の全データ（予定・記録・写真・動画・録音）を消します。\n元に戻せません。", "次へ", "やめる", true)) return;
@@ -1597,6 +1795,8 @@ const QA = [
   ["動画はどのくらい入る？", "iPhoneの空き容量しだいです。1分の動画でおよそ50〜150MB。150MBを超えると確認が出ます（800MBまで）。長い動画は写真アプリで短く切ってから入れると軽くなります。"],
   ["Face IDで開くには？", "「設定 → 🔐機密・ロック → Face ID（顔認証）で開く」をオンにして、今の暗証番号を入れ、Face IDを見せます。次から手帳を開くと自動でFace IDが出て、顔を見せるだけで開きます。<br>※iOS 18以降が必要です。PCやiPhoneごとに、それぞれの端末でオンにします。顔認証がうまくいかないときは、いつでも暗証番号で開けます。<br>※暗証番号を忘れた場合の保険にはなりません（バックアップを戻すときは暗証番号が必要です）。"],
   ["暗証番号を入れたらすぐ開く？", "はい。決めた桁数まで入れた瞬間に、ボタンを押さなくても開きます（この版にしてから最初の1回だけは「開く」ボタンを押してください。そこで桁数を覚えます）。"],
+  ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>会社名・名前は、「相手」の欄を長押し →「テキストをスキャン」で、iPhoneが名刺の文字をその場で読み取って入れてくれます。<br>すべてiPhoneの中だけで行い、外には送りません。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
+  ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開き、「＋追加」でサイト名・ID・PASSを入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>予定や写真と同じく暗号化して保存され、バックアップ・PCとの合体にも入ります。<br>※大事なPASSを入れるなら、手帳の暗証番号は<b>英字まじりの長め</b>にしてください。"],
   ["暗証番号を忘れたら？", "暗号の性質上、<b>誰にも開けられません</b>（作った人にも不可能です）。暗証番号は紙に書いて安全な所に保管してください。"],
   ["本当に他人に見られない？", "中身は全部 AES-256 で暗号化され、iPhoneの中だけに保存されます。ネットには送りません。席を立つときは右上の🔒を押してください。"],
   ["予定の時刻に鳴らすには？", "予定を開き「🔔呼び出し」で何分前かを選び、「📅 iPhoneのカレンダーに登録する」→ 出てきた画面で「追加」。手帳を閉じていても鳴ります。"],
@@ -1644,6 +1844,7 @@ const TOURS = [
 ];
 const HELP = [
   { s: "#btnLock", t: "ロック", x: "すぐに手帳を閉じて、暗証番号がないと開けないようにします。" },
+  { s: "#btnPw", t: "PASS帳", x: "各サイトのID・パスワードを暗号化して保存し、一覧からコピーできます。" },
   { s: "#btnFind", t: "探す", x: "一覧を開いて、すぐ検索できます。" },
   { s: "#btnHelp", t: "使い方", x: "ガイドとよくある質問を開きます。" },
   { s: "#navAdd", t: "追加", x: "新しい予定を作ります。「月」の画面では選んだ日に作ります。" },
@@ -1653,6 +1854,7 @@ const HELP = [
   { s: "#qPhoto", t: "写真・動画", x: "すぐカメラを開き、写真・動画を暗号化して記録します。入れた後タグを付けられます。" },
   { s: "#qRec", t: "録音メモ", x: "押した瞬間から録音が始まります。止めると保存。" },
   { s: "#qNote", t: "書くメモ", x: "文字のメモをすぐ書けます。" },
+  { s: "#qCard", t: "名刺", x: "名刺の写真から撮った日を読み取り、その日の記録として残します。" },
   { s: "#edRec", t: "録音", x: "押すと録音開始、もう一度押すと止めて保存します。" },
   { s: "#edIcs", t: "カレンダーに登録", x: "iPhoneのカレンダーに入れて、選んだ時刻に鳴らします。" },
   { s: "#edSec", t: "機密", x: "iPhoneのカレンダーや通知に題名を出さず「予定あり」とだけ出します。" },
