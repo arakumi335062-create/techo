@@ -453,6 +453,8 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <div id="pwList"></div>
     <div class="hint" style="margin-top:14px">「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」で貼れます。<br>🔒🔒 PASS帳は二重の鍵です。手帳の暗証番号に加えて、PASS帳専用の暗証番号でもう一度暗号化しています。閉じると鍵がかかり、開くたびに暗証番号が要ります。</div>
     <button class="btn wide" id="pwChg" style="margin-top:12px">PASS帳の暗証番号を変える</button>
+    <button class="btn wide" id="pwRec" style="margin-top:8px">🗝 復旧キー（合鍵）を作り直す</button>
+    <div class="hint">復旧キーは、PASS帳の暗証番号を忘れたときの合鍵です。紙に控えて金庫などに置いておくと、忘れても開けられます。</div>
   </div>
 </div>
 
@@ -478,7 +480,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const te = new TextEncoder(), td = new TextDecoder();
-const APP_VER = "2026.11.12-1"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
+const APP_VER = "2026.11.12-2"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
 const ITER = 600000;
 const CHUNK = 4 * 1024 * 1024;
 const DB_NAME = "systemTecho";
@@ -1555,22 +1557,72 @@ function askNewPass2(title, sub) {
     document.body.appendChild(m); setTimeout(() => m.querySelector("#npA").focus(), 50);
   });
 }
+/* 復旧キー：2つ目の暗証番号を忘れたときの合鍵。紙に控えておく。PASS帳の鍵を、復旧キーでも包んで保存する */
+function genRec() { const cs = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const b = rnd(20); let s = ""; for (let i = 0; i < 20; i++) s += cs[b[i] & 31] + (i % 4 === 3 && i < 19 ? "-" : ""); return s; }
+const normRec = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function wrapRec(master, code) { const w = await wrapMaster(master, normRec(code)); return { salt: b64(w.salt), iter: w.iter, iv: b64(w.wrap.iv), ct: b64(w.wrap.ct), at: Date.now() }; }
+function showRec(code) {
+  return new Promise(res => {
+    const m = document.createElement("div"); m.className = "modal";
+    m.innerHTML = `<div class="box"><p><b>🗝 復旧キー（合鍵）</b>\nPASS帳の暗証番号を忘れても、これがあれば開けられます。</p>
+      <div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:19px;font-weight:700;letter-spacing:.5px;text-align:center;padding:14px 6px;margin-bottom:10px;border:2px dashed var(--line);border-radius:10px;user-select:all;-webkit-user-select:all;word-break:break-all">${esc(code)}</div>
+      <p style="font-size:13px">・<b>紙に書き写して、金庫など手帳とは別の場所</b>に置いてください。\n・このiPhoneの中（写真・メモ）には置かないでください。\n・この画面を閉じると、二度と表示できません（作り直しはできます）。</p>
+      <div class="btns"><button class="btn" data-v="c">コピー</button><button class="btn pri" data-v="1">紙に控えた</button></div></div>`;
+    m.addEventListener("click", async e => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      if (b.dataset.v === "c") return copyText(code, "復旧キー");
+      if (!await ask("復旧キーを紙に控えましたか？\n閉じると、もう表示できません。", "控えた", "戻る")) return;
+      m.remove(); res();
+    });
+    document.body.appendChild(m);
+  });
+}
+function askText(title, sub, ph) {
+  return new Promise(res => {
+    const m = document.createElement("div"); m.className = "modal";
+    m.innerHTML = `<div class="box"><p><b>${esc(title)}</b>${sub ? "\n" + esc(sub) : ""}</p><input type="text" id="atIn" placeholder="${esc(ph || "")}" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" style="margin-bottom:12px;font-family:ui-monospace,Menlo,monospace"><div class="btns"><button class="btn" data-v="0">やめる</button><button class="btn pri" data-v="1">OK</button></div></div>`;
+    m.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; const v = m.querySelector("#atIn").value; m.remove(); res(b.dataset.v === "1" ? v : null); });
+    document.body.appendChild(m); setTimeout(() => m.querySelector("#atIn").focus(), 50);
+  });
+}
+/* 復旧キーで開けて、暗証番号を決め直す */
+async function recoverPw(pk) {
+  let master = null;
+  for (let i = 0; i < 3 && !master; i++) {
+    const c = await askText(i ? "復旧キーが違います。もう一度" : "復旧キーを入れてください", "紙に控えた20文字です（「-」は入れなくても構いません）", "XXXX-XXXX-XXXX-XXXX-XXXX");
+    if (c === null) return null;
+    busy("確認中…");
+    try { master = await unwrapMaster(pkMeta(pk.rec), normRec(c), true); } catch (e) {}
+    busy();
+  }
+  if (!master) { toast("復旧キーが違います", 3000); return null; }
+  const p = await askNewPass2("新しいPASS帳の暗証番号を決めます", "復旧キーで開きました。新しい暗証番号を決めてください。\n復旧キーはそのまま使えます。");
+  if (p === null) return null;
+  busy("変更中…");
+  try { const n = await makePk(master, p, pk.kid); n.rec = pk.rec; await dbPut("rec", "pk", await encJ(n)); } finally { busy(); }
+  pw2Fails = 0; pw2Wait = 0; toast("暗証番号を決め直しました", 3000);
+  return master;
+}
 /* 2つ目の暗証番号で鍵を開ける */
 async function unlock2(pk, title, extractable, noReset) {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; ; i++) {
     const w = pw2Wait - Date.now();
     if (w > 0) { toast("間違いが続いたため、あと" + Math.ceil(w / 1000) + "秒待ってください", 3500); return null; }
-    const p = await askPass(i ? "暗証番号が違います。もう一度" : (title || "PASS帳の暗証番号"), "手帳とは別の、PASS帳専用の暗証番号を入れてください");
+    const p = await askPass(title || "PASS帳の暗証番号", "手帳とは別の、PASS帳専用の暗証番号を入れてください");
     if (p === null) return null;
     busy("確認中…");
     try { const k = await unwrapMaster(pkMeta(pk), p, !!extractable); pw2Fails = 0; busy(); return k; }
-    catch (e) { if (++pw2Fails >= 5) pw2Wait = Date.now() + 60000; }
+    catch (e) { if (++pw2Fails >= 5) { pw2Wait = Date.now() + 60000; pw2Fails = 0; } }
     busy();
+    const c = await choose("PASS帳の暗証番号が違います。", [
+      ["a", "もう一度入れる", "", "pri"],
+      !noReset && pk.rec ? ["k", "🗝 復旧キーで開ける", "紙に控えた復旧キーを入れて、暗証番号を決め直します"] : null,
+      !noReset && i >= 2 ? ["r", "PASS帳を空にしてやり直す", "入っているID・PASS・写真はすべて消えます", "dng"] : null,
+      ["0", "やめる"]].filter(Boolean));
+    if (c === "k") return recoverPw(pk);
+    if (c === "r") { await resetPw(); return null; }
+    if (c !== "a") return null;
   }
-  if (noReset) { toast("暗証番号が違います", 3000); return null; }
-  const c = await choose("PASS帳の暗証番号が違います。", [["0", "やめる"], ["r", "忘れたので、PASS帳を空にしてやり直す", "入っているID・PASS・写真はすべて消えます", "dng"]]);
-  if (c === "r") await resetPw();
-  return null;
 }
 async function resetPw() {
   if (!await ask("PASS帳に入っているID・PASS・写真をすべて消します。\n元に戻せません。", "次へ", "やめる", true)) return;
@@ -1581,13 +1633,19 @@ async function resetPw() {
 }
 async function openPw() {
   if (!S.unlocked || S.busy) return;
-  let pk = await getPk(), k2 = null;
+  let pk = await getPk(), k2 = null, newRec = "";
   if (!pk) {
     const p = await askNewPass2("PASS帳専用の暗証番号を決めます", "手帳を開く暗証番号とは別のものにします。PASS帳を開くたびに入力します。\n忘れると中身は取り出せません。");
     if (p === null) return;
     busy("準備中…");
-    try { const m = await newMaster(); pk = await makePk(m, p); await dbPut("rec", "pk", await encJ(pk)); k2 = m; } finally { busy(); }
-  } else { k2 = await unlock2(pk); if (!k2) return; }
+    try { const m = await newMaster(); pk = await makePk(m, p); newRec = genRec(); pk.rec = await wrapRec(m, newRec); await dbPut("rec", "pk", await encJ(pk)); k2 = m; } finally { busy(); }
+  } else {
+    k2 = await unlock2(pk, null, !pk.rec); if (!k2) return;
+    if (!pk.rec) { /* 復旧キーがまだ無い手帳には、ここで作る */
+      busy("準備中…");
+      try { const cur = await getPk(); if (cur && !cur.rec) { newRec = genRec(); cur.rec = await wrapRec(k2, newRec); await dbPut("rec", "pk", await encJ(cur)); } } catch (e) { newRec = ""; } finally { busy(); }
+    }
+  }
   if (!S.unlocked) return;
   S.key2 = k2; S.pwd.clear(); let bad = 0;
   busy("開いています…");
@@ -1606,6 +1664,7 @@ async function openPw() {
   pwShown.clear(); $("#pwQ").value = ""; renderPw();
   $("#pw").classList.remove("hidden"); $("#pw").scrollTop = 0; document.body.style.overflow = "hidden";
   if (bad) toast(bad + "件は、別の暗証番号で鍵がかかっているため開けません", 5000);
+  if (newRec) await showRec(newRec);
 }
 function closePw() {
   if (pwEd) { const a = pwEd.added.slice(); pwEd = null; a.forEach(id => delPm(id)); }
@@ -1735,8 +1794,16 @@ $("#pwChg").onclick = async () => {
   const m = await unlock2(pk, "今のPASS帳の暗証番号", true, true); if (!m) return;
   const p = await askNewPass2("新しいPASS帳の暗証番号", "手帳を開く暗証番号とは別のものにします。\n忘れると中身は取り出せません。"); if (p === null) return;
   busy("変更中…");
-  try { await dbPut("rec", "pk", await encJ(await makePk(m, p, pk.kid))); } finally { busy(); }
-  toast("PASS帳の暗証番号を変えました。バックアップも取り直してください", 4500);
+  try { const n = await makePk(m, p, pk.kid); if (pk.rec) n.rec = pk.rec; await dbPut("rec", "pk", await encJ(n)); } finally { busy(); }
+  toast("PASS帳の暗証番号を変えました。復旧キーはそのまま使えます", 4500);
+};
+$("#pwRec").onclick = async () => {
+  const pk = await getPk(); if (!pk) return;
+  if (pk.rec && !await ask("復旧キーを作り直します。\n前に控えた復旧キーは使えなくなります。", "作り直す", "やめる")) return;
+  const m = await unlock2(pk, "今のPASS帳の暗証番号", true, true); if (!m) return;
+  busy("作成中…"); let code = "";
+  try { code = genRec(); pk.rec = await wrapRec(m, code); await dbPut("rec", "pk", await encJ(pk)); } finally { busy(); }
+  await showRec(code);
 };
 $("#pwList").addEventListener("click", e => {
   const im = e.target.closest("img[data-ph]"); if (im) return viewPw(im.dataset.ph);
@@ -2130,8 +2197,8 @@ const QA = [
   ["Face IDで開くには？", "「設定 → 🔐機密・ロック → Face ID（顔認証）で開く」をオンにして、今の暗証番号を入れ、Face IDを見せます。次から手帳を開くと自動でFace IDが出て、顔を見せるだけで開きます。<br>※iOS 18以降が必要です。PCやiPhoneごとに、それぞれの端末でオンにします。顔認証がうまくいかないときは、いつでも暗証番号で開けます。<br>※暗証番号を忘れた場合の保険にはなりません（バックアップを戻すときは暗証番号が必要です）。"],
   ["暗証番号を入れたらすぐ開く？", "はい。決めた桁数まで入れた瞬間に、ボタンを押さなくても開きます（この版にしてから最初の1回だけは「開く」ボタンを押してください。そこで桁数を覚えます）。"],
   ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>名刺の内容は、「設定 → 🤖名刺をAIで読む」にAPIキーを登録しておくと、名刺を入れた時にAIが読み取り、会社・部署役職・名前・電話・携帯・FAX・メール・住所を「相手」と「メモ」に自動で入れます（違うところは直せます）。この時だけ、名刺の写真がインターネット経由でAIに送られます。<br>AIを使いたくない名刺は、編集画面の「AIを使わずに読む」から、iPhoneの「テキストをスキャン」で読み取れます。<br>日付の読み取りはiPhoneの中だけで行います。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
-  ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開きます。<b>PASS帳は二重の鍵</b>で、手帳の暗証番号とは別の「PASS帳専用の暗証番号」を入れて開きます（最初の1回だけ、その番号を決めます）。<br>「＋追加」でサイト名・ID・PASS・メモ・写真（カードや契約書の写しなど）を入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>閉じるとすぐ鍵がかかり、次に開くときもPASS帳の暗証番号が要ります。サイト名も写真も、開けるまで見えません。<br>バックアップ・PCとの合体にも、鍵がかかったまま入ります。"],
-  ["PASS帳の暗証番号を忘れたら？", "取り出す方法はありません（誰にも開けられない作りです）。3回間違えると「PASS帳を空にしてやり直す」が選べますが、入っていたID・PASS・写真は消えます。<br>番号を変えたいときは、PASS帳の一番下の「PASS帳の暗証番号を変える」から。"],
+  ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開きます。<b>PASS帳は二重の鍵</b>で、手帳の暗証番号とは別の「PASS帳専用の暗証番号」を入れて開きます（最初の1回だけ、その番号を決めます。このとき表示される復旧キーは紙に控えてください）。<br>「＋追加」でサイト名・ID・PASS・メモ・写真（カードや契約書の写しなど）を入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>閉じるとすぐ鍵がかかり、次に開くときもPASS帳の暗証番号が要ります。サイト名も写真も、開けるまで見えません。<br>バックアップ・PCとの合体にも、鍵がかかったまま入ります。"],
+  ["PASS帳の暗証番号を忘れたら？", "<b>復旧キー（合鍵）</b>で開けられます。PASS帳の暗証番号を決めたときに表示される20文字で、紙に控えて金庫などに置いておきます。<br>忘れたときは、🔑 → 間違った番号でOK →「🗝復旧キーで開ける」→ 復旧キーを入れる → 新しい暗証番号を決める、の順です。<br>控えをなくしたら、開けられるうちに、PASS帳の一番下の「復旧キーを作り直す」で新しく作ってください。<br>暗証番号も復旧キーも両方なくすと、開ける方法はありません（その場合は「PASS帳を空にしてやり直す」になります）。"],
   ["暗証番号を忘れたら？", "暗号の性質上、<b>誰にも開けられません</b>（作った人にも不可能です）。暗証番号は紙に書いて安全な所に保管してください。"],
   ["本当に他人に見られない？", "中身は全部 AES-256 で暗号化され、iPhoneの中だけに保存されます。ネットには送りません。席を立つときは右上の🔒を押してください。"],
   ["予定の時刻に鳴らすには？", "予定を開き「🔔呼び出し」で何分前かを選び、「📅 iPhoneのカレンダーに登録する」→ 出てきた画面で「追加」。手帳を閉じていても鳴ります。"],
