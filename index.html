@@ -251,6 +251,10 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 .pwi .pwl .v{flex:1;min-width:0;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;user-select:text;-webkit-user-select:text}
 .pwi button{flex:none;border:1px solid var(--line);background:var(--surface2);border-radius:8px;height:36px;min-width:44px;padding:0 10px;font-size:13px}
 .pwi button.cp{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.pwph{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pwph img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--surface2)}
+.pwph .pwt{position:relative;display:inline-block;line-height:0}
+.pwph .pwt button{position:absolute;top:-8px;right:-8px;width:28px;height:28px;min-width:0;padding:0;border-radius:14px;border:0;background:#333;color:#fff;font-size:13px;line-height:28px}
 .pwi .pwm{font-size:13px;color:var(--sub);white-space:pre-wrap;word-break:break-all;margin-top:2px}
 .muted{color:var(--sub);font-size:13px}
 .sec{font-size:13px;color:var(--sub);line-height:1.6}
@@ -349,6 +353,13 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <div class="hint" id="bkLast"></div>
     <div class="sec" style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:10px">💻📱 <b>PCとiPhoneで共有するには</b><br>① 使った方の端末で「書き出す」→ Googleドライブに保存<br>② もう一方で、そのファイルを「読み込む」→「合体する」<br>両方で書いていても、両方の内容が残ります。消したものは両方で消えます。</div>
   </section>
+  <section class="card" id="cAI" data-tabs="set">
+    <h2>🤖 名刺をAIで読む</h2>
+    <p class="sec">名刺の写真をAI（Claude）に送って、会社名・名前・電話・住所などを自動で入れます。<b>名刺の写真がインターネット経由でAIに送られます。</b>使うにはAnthropicのAPIキーが要ります（読み取り1枚ごとに少額の利用料がかかります）。キーはこの端末の中に暗号化して保存します。</p>
+    <div class="fld"><input type="password" id="sAiKey" placeholder="APIキー（sk-ant-…）" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="btns"><button class="btn pri" id="sAiSave">保存</button><button class="btn" id="sAiTest">つながるか試す</button><button class="btn dng" id="sAiDel" style="flex:none">消す</button></div>
+    <div class="hint" id="sAiState"></div>
+  </section>
   <section class="card" id="cView" data-tabs="set">
     <h2>👁 表示</h2>
     <div class="row"><label>画面の明るさ</label><select id="sTheme"><option value="auto">iPhoneに合わせる</option><option value="light">明るい</option><option value="dark">暗い</option></select></div>
@@ -399,9 +410,12 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <div class="fld"><span class="lb">🎨 色</span><div class="colors" id="edColors"></div></div>
     <div class="fld card hidden" id="fCard" style="padding:12px">
       <span class="lb">🪪 名刺の内容を読み取る</span>
-      <textarea id="edCardTx" placeholder="① この枠を長押し →「テキストをスキャン」&#10;② 名刺にかざして「入力」&#10;③ 下のボタンを押す" style="min-height:96px" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-      <button class="btn wide pri" id="edCardGo" style="margin-top:8px">会社・名前・電話などに振り分ける</button>
-      <div class="hint">読み取りはiPhoneの機能がその場で行い、外には送りません。「テキストをスキャン」は「自動入力」の中にあることもあります。振り分けた結果は「相手」と「メモ」に入り、あとから直せます。</div>
+      <button class="btn wide pri" id="edCardAI">🤖 AIで名刺を読み取る</button>
+      <div class="hint">名刺の写真をAIに送り、会社・名前・電話・住所などを「相手」と「メモ」に入れます。APIキーを登録してあれば、名刺を入れた時に自動で読みます。</div>
+      <details style="margin-top:10px"><summary style="font-size:13px;color:var(--sub)">AIを使わずに読む（iPhoneの中だけ）</summary>
+        <textarea id="edCardTx" placeholder="① この枠を長押し →「テキストをスキャン」&#10;② 名刺にかざして「入力」&#10;③ 下のボタンを押す" style="min-height:96px;margin-top:8px" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+        <button class="btn wide" id="edCardGo" style="margin-top:8px">会社・名前・電話などに振り分ける</button>
+      </details>
     </div>
     <div class="fld two"><div><label for="edP">場所</label><input id="edP" placeholder="例：本社 会議室"></div><div><label for="edW">相手</label><input id="edW" placeholder="例：P社 ○○様"></div></div>
     <div class="fld"><label for="edM">メモ</label><textarea id="edM" placeholder="内容・決まったこと・宿題など"></textarea></div>
@@ -437,7 +451,8 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <input id="pwQ" type="search" placeholder="🔍 サイト名・IDで探す" autocomplete="off">
     <div class="muted" id="pwCount" style="margin-top:8px"></div>
     <div id="pwList"></div>
-    <div class="hint" style="margin-top:14px">「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」で貼れます。中身は予定や写真と同じく暗号化して、この端末の中だけに保存します。</div>
+    <div class="hint" style="margin-top:14px">「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」で貼れます。<br>🔒🔒 PASS帳は二重の鍵です。手帳の暗証番号に加えて、PASS帳専用の暗証番号でもう一度暗号化しています。閉じると鍵がかかり、開くたびに暗証番号が要ります。</div>
+    <button class="btn wide" id="pwChg" style="margin-top:12px">PASS帳の暗証番号を変える</button>
   </div>
 </div>
 
@@ -463,7 +478,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const te = new TextEncoder(), td = new TextDecoder();
-const APP_VER = "2026.11.11-4"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
+const APP_VER = "2026.11.12-1"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
 const ITER = 600000;
 const CHUNK = 4 * 1024 * 1024;
 const DB_NAME = "systemTecho";
@@ -1373,22 +1388,87 @@ function parseCard(raw) {
   if (!r.name) { const i = r.etc.findIndex(l => KJ.test(l) && l.replace(/ /g, "").length >= 2 && l.replace(/ /g, "").length <= 7); if (i >= 0) r.name = r.etc.splice(i, 1)[0]; }
   return r;
 }
+/* ============ 名刺をAIで読む ============
+   名刺の写真をAI（Claude）に送り、会社・名前・電話などを受け取る。APIキーは設定の中に暗号化して保存。 */
+const AI_MODEL = "claude-haiku-5-5";
+const AI_CARD_PROMPT = "この画像は名刺です。書かれている内容を読み取り、次の形のJSONだけを返してください。説明や前置きは不要です。書かれていない項目は空にし、推測で埋めないでください。\n{\"company\":\"会社名\",\"department\":\"部署\",\"title\":\"役職\",\"name\":\"氏名\",\"name_reading\":\"氏名の読み（ローマ字やふりがながあれば）\",\"tel\":[\"電話\"],\"mobile\":[\"携帯\"],\"fax\":[\"FAX\"],\"email\":[\"メール\"],\"address\":\"郵便番号と住所\",\"url\":[\"URL\"],\"other\":\"その他に書かれていること\"}";
+async function aiCall(body) {
+  const key = S.settings.aiKey; if (!key) throw new Error("APIキーが登録されていません");
+  let res;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify(Object.assign({ model: S.settings.aiModel || AI_MODEL, max_tokens: 800 }, body)) });
+  } catch (e) { throw new Error("インターネットにつながりません"); }
+  if (!res.ok) {
+    let m = ""; try { m = (await res.json()).error.message; } catch (e) {}
+    throw new Error(res.status === 401 ? "APIキーが違います" : res.status === 429 ? "利用の上限に当たりました。少し待ってからもう一度" : "AIから返事がありません（" + res.status + "）" + (m ? " " + m : ""));
+  }
+  const j = await res.json();
+  return (j.content || []).filter(c => c.type === "text").map(c => c.text).join("");
+}
+async function cardAI(blob) {
+  const small = await resizeTo(await loadImg(blob), 1568, 0.82);
+  const txt = await aiCall({ messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64(await small.arrayBuffer()) } }, { type: "text", text: AI_CARD_PROMPT }] }] });
+  const m = txt.match(/\{[\s\S]*\}/); if (!m) throw new Error("名刺として読み取れませんでした");
+  let j; try { j = JSON.parse(m[0]); } catch (e) { throw new Error("名刺として読み取れませんでした"); }
+  const arr = v => (Array.isArray(v) ? v : v ? [v] : []).map(x => String(x).trim()).filter(Boolean), str = v => String(v || "").trim();
+  return { co: str(j.company), dept: arr([str(j.department), str(j.title)].filter(Boolean).join(" ")), name: str(j.name), tel: arr(j.tel), mob: arr(j.mobile), fax: arr(j.fax), mail: arr(j.email), url: arr(j.url), addr: arr(j.address), etc: arr([str(j.name_reading), str(j.other)]) };
+}
+/* 読み取った結果を、メモ用の文と「相手」「題名」にする */
+function cardText(r) {
+  return [["会社", r.co], ["部署・役職", r.dept.join(" ／ ")], ["名前", r.name], ["電話", r.tel.join("、")], ["携帯", r.mob.join("、")], ["FAX", r.fax.join("、")], ["メール", r.mail.join("、")], ["住所", r.addr.join(" ")], ["URL", r.url.join("、")], ["その他", r.etc.join(" ／ ")]].filter(x => x[1]).map(x => x[0] + "：" + x[1]).join("\n");
+}
+function cardToEntry(e, r) {
+  const block = cardText(r); if (!block) return false;
+  e.memo = block + (e.memo ? "\n\n" + e.memo : "");
+  const who = [r.co, r.name].filter(Boolean).join(" "); if (who) e.who = who;
+  if ((!e.title || e.title === "名刺交換") && (r.co || r.name)) e.title = "名刺交換 " + (r.co || r.name);
+  return true;
+}
+function applyCardEd(r) {
+  if (!ED) return false;
+  const t = { memo: $("#edM").value.trim(), who: $("#edW").value, title: $("#edT").value.trim() };
+  if (!cardToEntry(t, r)) return false;
+  $("#edM").value = t.memo; $("#edW").value = t.who; $("#edT").value = t.title; ED.dirty = true;
+  return true;
+}
 $("#edCardGo").onclick = () => {
   if (!ED) return;
   const raw = $("#edCardTx").value.trim();
   if (!raw) return toast("先に上の枠を長押し →「テキストをスキャン」で名刺を読み取ってください", 4000);
-  const r = parseCard(raw);
-  const rows = [["会社", r.co], ["部署・役職", r.dept.join(" ／ ")], ["名前", r.name], ["電話", r.tel.join("、")], ["携帯", r.mob.join("、")], ["FAX", r.fax.join("、")], ["メール", r.mail.join("、")], ["住所", r.addr.join(" ")], ["URL", r.url.join("、")], ["その他", r.etc.join(" ／ ")]].filter(x => x[1]);
-  const block = rows.map(x => x[0] + "：" + x[1]).join("\n");
-  const old = $("#edM").value.trim();
-  $("#edM").value = block + (old ? "\n\n" + old : "");
-  const who = [r.co, r.name].filter(Boolean).join(" ");
-  if (who) $("#edW").value = who;
-  const t = $("#edT").value.trim();
-  if ((!t || t === "名刺交換") && (r.co || r.name)) $("#edT").value = "名刺交換 " + (r.co || r.name);
-  $("#edCardTx").value = ""; ED.dirty = true;
+  applyCardEd(parseCard(raw)); $("#edCardTx").value = "";
   toast("振り分けました。「相手」と「メモ」を見て、違うところは直してください", 4000);
   $("#edW").scrollIntoView({ block: "center" });
+};
+$("#edCardAI").onclick = async () => {
+  if (!ED) return;
+  if (!S.settings.aiKey) return toast("先に「設定 → 🤖名刺をAIで読む」でAPIキーを登録してください", 4500);
+  const p = ED.e.photos.find(x => x.type === "photo" && (x.tags || []).includes("名刺")) || ED.e.photos.find(x => x.type === "photo");
+  if (!p) return toast("先に名刺の写真を入れてください");
+  S.busy = true; busy("AIが名刺を読んでいます…");
+  try {
+    const blob = await (await fetch(await mediaURL(p.id, p.mime))).blob();
+    const ok = applyCardEd(await cardAI(blob));
+    busy(); toast(ok ? "読み取りました。「相手」と「メモ」を見て、違うところは直してください" : "名刺の文字が見つかりませんでした", 4000);
+    if (ok) $("#edW").scrollIntoView({ block: "center" });
+  } catch (e) { busy(); toast("読み取れませんでした：" + (e.message || e), 5000); }
+  finally { busy(); S.busy = false; lastAct = Date.now(); }
+};
+$("#sAiSave").onclick = async () => {
+  const v = $("#sAiKey").value.trim(); if (!v) return toast("APIキーを入れてください");
+  S.settings.aiKey = v; await saveSettings(); $("#sAiKey").value = ""; applySettingsUI(); toast("APIキーを保存しました");
+};
+$("#sAiDel").onclick = async () => {
+  if (!S.settings.aiKey) return;
+  if (!await ask("登録してあるAPIキーをこの端末から消しますか？", "消す", "やめる", true)) return;
+  S.settings.aiKey = ""; await saveSettings(); applySettingsUI(); toast("消しました");
+};
+$("#sAiTest").onclick = async () => {
+  if (!S.settings.aiKey) return toast("先にAPIキーを保存してください");
+  busy("AIにつないでいます…");
+  try { await aiCall({ max_tokens: 5, messages: [{ role: "user", content: "OK" }] }); busy(); toast("つながりました ✓", 3000); }
+  catch (e) { busy(); toast("つながりません：" + (e.message || e), 6000); }
 };
 function cardEntry(d) {
   const e = newEntry("note", d ? d.date : null);
@@ -1401,9 +1481,9 @@ $("#qCard").onclick = () => { pickerOpen = true; $("#cardIn").value = ""; $("#ca
 $("#cardIn").addEventListener("change", async ev => {
   pickerOpen = false;
   const files = [...ev.target.files].filter(f => !(f.type || "").startsWith("video")); if (!files.length || !S.unlocked) return;
-  if (files.length > 1 && !await ask("名刺 " + files.length + "枚を、それぞれ撮った日の記録として1件ずつ登録します。\n会社名・名前はあとで各記録を開いて入れられます。", "登録する", "やめる")) return;
+  if (files.length > 1 && !await ask("名刺 " + files.length + "枚を、それぞれ撮った日の記録として1件ずつ登録します。\n" + (S.settings.aiKey ? "内容はAIが読み取って入れます。" : "会社名・名前はあとで各記録を開いて入れられます。"), "登録する", "やめる")) return;
   S.busy = true; busy("名刺を読み取って保存中…");
-  let nodate = 0, fail = 0; const days = new Set();
+  let nodate = 0, fail = 0, aiOk = 0, aiNg = 0, aiMsg = ""; const days = new Set();
   try {
     if (files.length === 1) {
       const f = files[0], d = await photoDate(f), e = cardEntry(d);
@@ -1411,8 +1491,12 @@ $("#cardIn").addEventListener("change", async ev => {
       try { const m = await storePhoto(f); if (ED) { ED.e.photos.push(m); ED.added.push(m.id); ED.dirty = true; } else await delMedia(m.id); }
       catch (x) { busy(); closeEditor(); toast("この写真は読み込めませんでした"); return; }
       learnTags(["名刺"]); renderEdPhotos();
+      let ai = "";
+      if (S.settings.aiKey) { busy("AIが名刺を読んでいます…"); try { ai = applyCardEd(await cardAI(f)) ? "ok" : "名刺の文字が見つかりませんでした"; } catch (x) { ai = x.message || String(x); } }
       busy();
-      toast(d ? "撮った日 " + fmtDay(d.date) + " の記録にしました。「名刺の内容を読み取る」で会社名・名前を入れられます" : "写真に撮影日が入っていなかったので、今日の日付にしています。違う場合は日付を直してください", 5000);
+      if (ai === "ok") { toast((d ? "撮った日 " + fmtDay(d.date) : "今日の日付（写真に撮影日なし）") + " の記録にして、AIで内容を読み取りました。確かめて保存してください", 5000); return; }
+      if (ai) { toast("AIでは読み取れませんでした：" + ai, 6000); return; }
+      toast(d ? "撮った日 " + fmtDay(d.date) + " の記録にしました。「設定 → 🤖名刺をAIで読む」にAPIキーを入れると、内容も自動で入ります" : "写真に撮影日が入っていなかったので、今日の日付にしています。違う場合は日付を直してください", 5000);
       return;
     }
     let i = 0;
@@ -1420,36 +1504,150 @@ $("#cardIn").addEventListener("change", async ev => {
       busy("名刺を読み取って保存中… " + (++i) + "/" + files.length);
       try {
         const d = await photoDate(f), e = cardEntry(d); if (!d) nodate++;
-        e.photos = [await storePhoto(f)]; await putEntry(e); days.add(e.date);
+        e.photos = [await storePhoto(f)];
+        if (S.settings.aiKey) { busy("AIが名刺を読んでいます… " + i + "/" + files.length); try { if (cardToEntry(e, await cardAI(f))) aiOk++; else aiNg++; } catch (x) { aiNg++; aiMsg = x.message || String(x); } }
+        await putEntry(e); days.add(e.date);
       } catch (x) { fail++; }
     }
     learnTags(["名刺"]);
   } finally { busy(); S.busy = false; lastAct = Date.now(); }
   renderAll();
-  await info("名刺 " + (files.length - fail) + "枚を登録しました ✓\n\n入れた日：" + [...days].sort().map(fmtDay).join("、") + (nodate ? "\n\n※" + nodate + "枚は写真に撮影日が入っていなかったので、今日の日付にしています。" : "") + (fail ? "\n※" + fail + "枚は読み込めませんでした。" : "") + "\n\n「🖼写真」や「一覧」で #名刺 を押すとまとめて見られます。");
+  await info("名刺 " + (files.length - fail) + "枚を登録しました ✓\n\n入れた日：" + [...days].sort().map(fmtDay).join("、") + (nodate ? "\n\n※" + nodate + "枚は写真に撮影日が入っていなかったので、今日の日付にしています。" : "") + (fail ? "\n※" + fail + "枚は読み込めませんでした。" : "") + (aiOk ? "\n\nAIで内容を読み取った名刺：" + aiOk + "枚" : "") + (aiNg ? "\n※" + aiNg + "枚はAIで読み取れませんでした" + (aiMsg ? "（" + aiMsg + "）" : "") + "。記録を開いて「🤖AIで名刺を読み取る」でやり直せます。" : "") + "\n\n「🖼写真」や「一覧」で #名刺 を押すとまとめて見られます。");
 });
 
-/* ============ PASS帳（各サイトのID・パスワード） ============
-   1件ずつ暗号化して "p:"＋番号 で保存。消した記録は "q:"＋番号（合体のとき他の端末でも消すため）。 */
-const pwShown = new Set();
+/* ============ PASS帳（各サイトのID・パスワード・写真）— 二重の鍵 ============
+   手帳の鍵（1つ目）に加えて、PASS帳専用の暗証番号（2つ目）で中身をもう一度暗号化する。
+   p:番号  = 手帳の鍵{ id, updated, created, ph:[写真の番号], z: PASS帳の鍵{ site,url,user,pass,memo } }
+   pm:番号 = 手帳の鍵{ PASS帳の鍵{ 写真 } }
+   pk      = PASS帳の鍵を、2つ目の暗証番号で包んだもの　　q:番号 = 消した記録（合体用） */
+const pwShown = new Set(), pwUrls = new Map();
+let pwEd = null, pw2Fails = 0, pw2Wait = 0;
+S.pwd = new Map(); S.key2 = null;
+async function enc2(o, k) { const r = await encB(te.encode(JSON.stringify(o)), k); return { iv: b64(r.iv), ct: b64(r.ct) }; }
+async function dec2(z, k) { return JSON.parse(td.decode(await decB({ iv: unb64(z.iv), ct: unb64(z.ct).buffer }, k))); }
+async function enc2B(buf, k) { const r = await encB(buf, k); const u = new Uint8Array(12 + r.ct.byteLength); u.set(r.iv, 0); u.set(new Uint8Array(r.ct), 12); return u.buffer; }
+async function dec2B(buf, k) { const u = new Uint8Array(buf); return decB({ iv: u.slice(0, 12), ct: u.slice(12).buffer }, k); }
+async function getPk() { const r = await dbGet("rec", "pk"); if (!r) return null; try { return await decJ(r); } catch (e) { return null; } }
+async function makePk(master, pass, kid) { const w = await wrapMaster(master, pass); return { kid: kid || uid(), salt: b64(w.salt), iter: w.iter, iv: b64(w.wrap.iv), ct: b64(w.wrap.ct), t: Date.now() }; }
+const pkMeta = pk => ({ salt: unb64(pk.salt), iter: pk.iter, wrap: { iv: unb64(pk.iv), ct: unb64(pk.ct).buffer } });
 async function loadPw() {
   S.pw.clear();
   for (const r of await dbRange("p:", "p:\uffff")) { try { const x = await decJ(r); S.pw.set(x.id, x); } catch (e) {} }
 }
-function openPw() { if (!S.unlocked) return; pwShown.clear(); $("#pwQ").value = ""; renderPw(); $("#pw").classList.remove("hidden"); $("#pw").scrollTop = 0; document.body.style.overflow = "hidden"; }
-function closePw() { pwShown.clear(); $("#pwList").innerHTML = ""; $("#pwQ").value = ""; $("#pw").classList.add("hidden"); if ($("#ed").classList.contains("hidden")) document.body.style.overflow = ""; }
+/* 2つ目の暗証番号を新しく決める（手帳の暗証番号と同じものは不可） */
+function askNewPass2(title, sub) {
+  return new Promise(res => {
+    const m = document.createElement("div"); m.className = "modal";
+    m.innerHTML = `<div class="box"><p><b>${esc(title)}</b>\n${esc(sub)}</p><input type="password" id="npA" placeholder="PASS帳の暗証番号（6文字以上）" autocomplete="new-password" style="margin-bottom:8px"><input type="password" id="npB" placeholder="もう一度" autocomplete="new-password" style="margin-bottom:6px"><div id="npE" style="color:var(--danger,#c0392b);font-size:13px;min-height:18px;margin-bottom:8px"></div><div class="btns"><button class="btn" data-v="0">やめる</button><button class="btn pri" data-v="1">決める</button></div></div>`;
+    const err = t => { m.querySelector("#npE").textContent = t; };
+    m.addEventListener("click", async e => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      if (b.dataset.v === "0") { m.remove(); return res(null); }
+      const a = m.querySelector("#npA").value, c = m.querySelector("#npB").value;
+      if (a.length < 6) return err("6文字以上にしてください");
+      if (a !== c) return err("2回の入力が違います");
+      busy("確認中…"); let same = false;
+      try { await unwrapMaster(await dbGet("meta", "k"), a); same = true; } catch (x) {}
+      busy();
+      if (same) return err("手帳を開く暗証番号と同じものは使えません。別のものにしてください");
+      m.remove(); res(a);
+    });
+    document.body.appendChild(m); setTimeout(() => m.querySelector("#npA").focus(), 50);
+  });
+}
+/* 2つ目の暗証番号で鍵を開ける */
+async function unlock2(pk, title, extractable, noReset) {
+  for (let i = 0; i < 3; i++) {
+    const w = pw2Wait - Date.now();
+    if (w > 0) { toast("間違いが続いたため、あと" + Math.ceil(w / 1000) + "秒待ってください", 3500); return null; }
+    const p = await askPass(i ? "暗証番号が違います。もう一度" : (title || "PASS帳の暗証番号"), "手帳とは別の、PASS帳専用の暗証番号を入れてください");
+    if (p === null) return null;
+    busy("確認中…");
+    try { const k = await unwrapMaster(pkMeta(pk), p, !!extractable); pw2Fails = 0; busy(); return k; }
+    catch (e) { if (++pw2Fails >= 5) pw2Wait = Date.now() + 60000; }
+    busy();
+  }
+  if (noReset) { toast("暗証番号が違います", 3000); return null; }
+  const c = await choose("PASS帳の暗証番号が違います。", [["0", "やめる"], ["r", "忘れたので、PASS帳を空にしてやり直す", "入っているID・PASS・写真はすべて消えます", "dng"]]);
+  if (c === "r") await resetPw();
+  return null;
+}
+async function resetPw() {
+  if (!await ask("PASS帳に入っているID・PASS・写真をすべて消します。\n元に戻せません。", "次へ", "やめる", true)) return;
+  if (!await ask("本当に消しますか？", "全部消す", "やめる", true)) return;
+  for (const id of [...S.pw.keys()]) await removePw(id);
+  await dbDel("rec", "pk");
+  toast("PASS帳を空にしました。🔑を押すと、新しい暗証番号から決め直せます", 4500);
+}
+async function openPw() {
+  if (!S.unlocked || S.busy) return;
+  let pk = await getPk(), k2 = null;
+  if (!pk) {
+    const p = await askNewPass2("PASS帳専用の暗証番号を決めます", "手帳を開く暗証番号とは別のものにします。PASS帳を開くたびに入力します。\n忘れると中身は取り出せません。");
+    if (p === null) return;
+    busy("準備中…");
+    try { const m = await newMaster(); pk = await makePk(m, p); await dbPut("rec", "pk", await encJ(pk)); k2 = m; } finally { busy(); }
+  } else { k2 = await unlock2(pk); if (!k2) return; }
+  if (!S.unlocked) return;
+  S.key2 = k2; S.pwd.clear(); let bad = 0;
+  busy("開いています…");
+  try {
+    for (const o of [...S.pw.values()]) {
+      if (!o.z) { /* 鍵が1つだった頃の記録 → 2つ目の鍵をかけ直す */
+        const inner = { site: o.site || "", url: o.url || "", user: o.user || "", pass: o.pass || "", memo: o.memo || "" };
+        const n = { id: o.id, created: o.created, updated: o.updated || Date.now(), ph: [], z: await enc2(inner, k2) };
+        S.pw.set(o.id, n); await dbPut("rec", "p:" + o.id, await encJ(n));
+        S.pwd.set(o.id, Object.assign(inner, { id: o.id, ph: [], created: n.created }));
+      } else {
+        try { S.pwd.set(o.id, Object.assign(await dec2(o.z, k2), { id: o.id, ph: (o.ph || []).slice(), created: o.created })); } catch (e) { bad++; }
+      }
+    }
+  } finally { busy(); }
+  pwShown.clear(); $("#pwQ").value = ""; renderPw();
+  $("#pw").classList.remove("hidden"); $("#pw").scrollTop = 0; document.body.style.overflow = "hidden";
+  if (bad) toast(bad + "件は、別の暗証番号で鍵がかかっているため開けません", 5000);
+}
+function closePw() {
+  if (pwEd) { const a = pwEd.added.slice(); pwEd = null; a.forEach(id => delPm(id)); }
+  S.key2 = null; S.pwd.clear(); pwShown.clear();
+  for (const u of pwUrls.values()) URL.revokeObjectURL(u); pwUrls.clear();
+  $("#pwView")?.remove(); $$(".bsheet.pwed").forEach(x => x.remove());
+  $("#pwList").innerHTML = ""; $("#pwQ").value = ""; $("#pw").classList.add("hidden");
+  if ($("#ed").classList.contains("hidden")) document.body.style.overflow = "";
+}
+async function delPm(id) { for (const k of [id, id + "_t"]) { await dbDel("rec", "pm:" + k); if (pwUrls.has(k)) { URL.revokeObjectURL(pwUrls.get(k)); pwUrls.delete(k); } } }
+async function pwImg(id, thumb) {
+  const key = id + (thumb ? "_t" : "");
+  if (pwUrls.has(key)) return pwUrls.get(key);
+  const k2 = S.key2; if (!k2) return "";
+  let r = await dbGet("rec", "pm:" + key); if (!r && thumb) r = await dbGet("rec", "pm:" + id); if (!r) return "";
+  const buf = await dec2B(await decB(r), k2);
+  if (S.key2 !== k2) return "";
+  const u = URL.createObjectURL(new Blob([buf], { type: "image/jpeg" })); pwUrls.set(key, u); return u;
+}
+function fillPh(root) { root.querySelectorAll("img[data-ph]").forEach(async im => { try { im.src = await pwImg(im.dataset.ph, true); } catch (e) {} }); }
+async function viewPw(id) {
+  let u = ""; try { u = await pwImg(id, false); } catch (e) {}
+  if (!u) return toast("写真を開けませんでした");
+  const v = document.createElement("div"); v.id = "pwView";
+  v.style.cssText = "position:fixed;inset:0;z-index:110;background:#000;display:flex;align-items:center;justify-content:center";
+  v.innerHTML = `<img src="${u}" style="max-width:100%;max-height:100%;object-fit:contain"><button style="position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;height:40px;padding:0 14px;border-radius:20px;border:0;background:rgba(255,255,255,.2);color:#fff;font-size:14px">閉じる</button>`;
+  v.onclick = () => v.remove(); document.body.appendChild(v);
+}
 function renderPw() {
   const ws = $("#pwQ").value.trim().toLowerCase().split(/[\s　]+/).filter(Boolean);
-  const arr = [...S.pw.values()].filter(x => { const hay = [x.site, x.url, x.user, x.memo].join(" ").toLowerCase(); return ws.every(w => hay.includes(w)); })
+  const arr = [...S.pwd.values()].filter(x => { const hay = [x.site, x.url, x.user, x.memo].join(" ").toLowerCase(); return ws.every(w => hay.includes(w)); })
     .sort((a, b) => (a.site || "").localeCompare(b.site || "", "ja"));
-  $("#pwCount").textContent = S.pw.size ? arr.length + "件" + (ws.length ? "（絞り込み中）" : "") : "";
+  $("#pwCount").textContent = S.pwd.size ? arr.length + "件" + (ws.length ? "（絞り込み中）" : "") : "";
   $("#pwList").innerHTML = arr.length ? arr.map(x => `<div class="pwi" data-id="${x.id}">
     <div class="pwh"><b>${esc(x.site || "（無題）")}</b><button data-a="ed">✎ 直す</button></div>
     ${x.url ? `<div class="pwl"><span class="k">URL</span><span class="v" style="font-size:13px">${esc(x.url)}</span><button data-a="cl">コピー</button></div>` : ""}
     <div class="pwl"><span class="k">ID</span><span class="v">${esc(x.user || "")}</span><button class="cp" data-a="cu">コピー</button></div>
     <div class="pwl"><span class="k">PASS</span><span class="v">${pwShown.has(x.id) ? esc(x.pass || "") : "•".repeat(Math.min(12, Math.max(6, (x.pass || "").length)))}</span><button data-a="sh">${pwShown.has(x.id) ? "隠す" : "見る"}</button><button class="cp" data-a="cp">コピー</button></div>
-    ${x.memo ? `<div class="pwm">${esc(x.memo)}</div>` : ""}</div>`).join("")
-    : `<div class="empty" style="margin-top:10px">${S.pw.size ? "見つかりません" : "まだ何も入っていません。右上の「＋追加」から入れられます"}</div>`;
+    ${x.memo ? `<div class="pwm">${esc(x.memo)}</div>` : ""}
+    ${x.ph.length ? `<div class="pwph">${x.ph.map(p => `<img data-ph="${p}" alt="写真">`).join("")}</div>` : ""}</div>`).join("")
+    : `<div class="empty" style="margin-top:10px">${S.pwd.size ? "見つかりません" : "まだ何も入っていません。右上の「＋追加」から入れられます"}</div>`;
+  fillPh($("#pwList"));
 }
 async function copyText(t, what) {
   if (!t) return toast(what + "が入っていません");
@@ -1464,9 +1662,11 @@ function genPass(n = 16) {
   return out;
 }
 function editPw(x) {
+  if (!S.key2) return;
   closeSheets();
-  const isNew = !x; x = x || { id: uid(), site: "", url: "", user: "", pass: "", memo: "", created: Date.now() };
-  const b = document.createElement("div"); b.className = "bsheet";
+  const isNew = !x; x = x || { id: uid(), site: "", url: "", user: "", pass: "", memo: "", ph: [], created: Date.now() };
+  const ph = x.ph.slice(); pwEd = { added: [] };
+  const b = document.createElement("div"); b.className = "bsheet pwed";
   const at = 'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"';
   b.innerHTML = `<div class="panel"><h3>${isNew ? "PASSを追加" : "PASSを直す"}<button data-x>✕</button></h3>
     <div class="fld"><label>サイト・サービスの名前</label><input id="pfSite" placeholder="例：○○銀行 法人ネットバンク" autocomplete="off" value="${esc(x.site)}"></div>
@@ -1474,31 +1674,74 @@ function editPw(x) {
     <div class="fld"><label>ID（ユーザー名・メールアドレス）</label><input id="pfUser" ${at} value="${esc(x.user)}"></div>
     <div class="fld"><label>PASS（パスワード）</label><div style="display:flex;gap:6px"><input id="pfPass" ${at} style="flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace" value="${esc(x.pass)}"><button class="btn sm" id="pfGen">自動で作る</button></div></div>
     <div class="fld"><label>メモ（秘密の質問・契約番号など）</label><textarea id="pfMemo" style="min-height:70px">${esc(x.memo)}</textarea></div>
+    <div class="fld"><label>写真（カード・契約書・設定画面の写しなど）</label><div class="pwph" id="pfPh"></div><button class="btn sm" id="pfAddPh" style="margin-top:6px">📷 写真を入れる</button><input type="file" id="pfFile" accept="image/*" multiple class="hidden"></div>
     <div class="btns">${isNew ? "" : `<button class="btn dng" id="pfDel" style="flex:none">削除</button>`}<button class="btn" data-x>やめる</button><button class="btn pri" id="pfOk">保存する</button></div></div>`;
   document.body.appendChild(b);
-  b.addEventListener("click", e => { if (e.target.closest("[data-x]")) b.remove(); });
+  const drawPh = () => { const d = b.querySelector("#pfPh"); d.innerHTML = ph.map(p => `<span class="pwt"><img data-ph="${p}" alt="写真"><button data-rm="${p}" aria-label="この写真を外す">✕</button></span>`).join(""); fillPh(d); };
+  drawPh();
+  const cancel = () => { const a = pwEd ? pwEd.added.slice() : []; pwEd = null; a.forEach(id => delPm(id)); b.remove(); };
+  b.addEventListener("click", e => {
+    if (e.target.closest("[data-x]")) return cancel();
+    const rm = e.target.closest("[data-rm]"); if (rm) { ph.splice(ph.indexOf(rm.dataset.rm), 1); drawPh(); return; }
+    const im = e.target.closest("img[data-ph]"); if (im) viewPw(im.dataset.ph);
+  });
+  const fi = b.querySelector("#pfFile");
+  b.querySelector("#pfAddPh").onclick = () => { pickerOpen = true; fi.value = ""; fi.click(); };
+  fi.addEventListener("change", async ev => {
+    pickerOpen = false; const k2 = S.key2, files = [...ev.target.files]; if (!k2 || !pwEd || !files.length) return;
+    let fail = 0; busy("写真を暗号化して保存中…");
+    try {
+      for (const f of files) {
+        try {
+          const img = await loadImg(f), big = await resizeTo(img, 2000, 0.85), th = await resizeTo(img, 320, 0.7), id = uid();
+          await dbPut("rec", "pm:" + id, await encB(await enc2B(await big.arrayBuffer(), k2)));
+          await dbPut("rec", "pm:" + id + "_t", await encB(await enc2B(await th.arrayBuffer(), k2)));
+          if (pwEd) { ph.push(id); pwEd.added.push(id); } else await delPm(id);
+        } catch (e) { fail++; }
+      }
+    } finally { busy(); lastAct = Date.now(); }
+    drawPh(); if (fail) toast(fail + "枚は読み込めませんでした", 3500);
+  });
   b.querySelector("#pfGen").onclick = async () => { const i = b.querySelector("#pfPass"); if (i.value && !await ask("今入っているPASSを、新しく作ったものに入れ替えますか？", "入れ替える", "やめる")) return; i.value = genPass(); };
   b.querySelector("#pfOk").onclick = async () => {
+    const k2 = S.key2; if (!k2) return;
     const g = id => b.querySelector(id).value;
-    Object.assign(x, { site: g("#pfSite").trim(), url: g("#pfUrl").trim(), user: g("#pfUser").trim(), pass: g("#pfPass"), memo: g("#pfMemo").trim(), updated: Date.now() });
-    if (!x.site && !x.user && !x.pass) return toast("名前かID・PASSを入れてください");
-    if (!x.site) x.site = x.url || x.user;
-    S.pw.set(x.id, x); await dbPut("rec", "p:" + x.id, await encJ(x));
-    b.remove(); renderPw(); toast("保存しました");
+    const inner = { site: g("#pfSite").trim(), url: g("#pfUrl").trim(), user: g("#pfUser").trim(), pass: g("#pfPass"), memo: g("#pfMemo").trim() };
+    if (!inner.site && !inner.user && !inner.pass && !ph.length) return toast("名前かID・PASSを入れてください");
+    if (!inner.site) inner.site = inner.url || inner.user || "（無題）";
+    const o = { id: x.id, created: x.created, updated: Date.now(), ph: ph.slice(), z: await enc2(inner, k2) };
+    S.pw.set(o.id, o); await dbPut("rec", "p:" + o.id, await encJ(o));
+    S.pwd.set(o.id, Object.assign(inner, { id: o.id, ph: ph.slice(), created: o.created }));
+    for (const p of x.ph) if (!ph.includes(p)) await delPm(p);
+    pwEd = null; b.remove(); renderPw(); toast("保存しました");
   };
   if (!isNew) b.querySelector("#pfDel").onclick = async () => {
-    if (!await ask("「" + (x.site || "無題") + "」のPASSを削除しますか？", "削除する", "やめる", true)) return;
+    if (!await ask("「" + (x.site || "無題") + "」のPASSを削除しますか？" + (x.ph.length ? "\n入れてある写真も消えます。" : ""), "削除する", "やめる", true)) return;
+    const a = pwEd ? pwEd.added.slice() : []; pwEd = null; for (const id of a) await delPm(id);
     await removePw(x.id); b.remove(); renderPw(); toast("削除しました");
   };
 }
-async function removePw(id, t) { S.pw.delete(id); pwShown.delete(id); await dbDel("rec", "p:" + id); await dbPut("rec", "q:" + id, await encJ({ id, t: t || Date.now() })); }
+async function removePw(id, t) {
+  const o = S.pw.get(id); for (const p of (o && o.ph) || []) await delPm(p);
+  S.pw.delete(id); S.pwd.delete(id); pwShown.delete(id);
+  await dbDel("rec", "p:" + id); await dbPut("rec", "q:" + id, await encJ({ id, t: t || Date.now() }));
+}
 $("#btnPw").onclick = openPw;
 $("#pwClose").onclick = closePw;
 $("#pwAdd").onclick = () => editPw(null);
 $("#pwQ").addEventListener("input", renderPw);
+$("#pwChg").onclick = async () => {
+  const pk = await getPk(); if (!pk) return;
+  const m = await unlock2(pk, "今のPASS帳の暗証番号", true, true); if (!m) return;
+  const p = await askNewPass2("新しいPASS帳の暗証番号", "手帳を開く暗証番号とは別のものにします。\n忘れると中身は取り出せません。"); if (p === null) return;
+  busy("変更中…");
+  try { await dbPut("rec", "pk", await encJ(await makePk(m, p, pk.kid))); } finally { busy(); }
+  toast("PASS帳の暗証番号を変えました。バックアップも取り直してください", 4500);
+};
 $("#pwList").addEventListener("click", e => {
+  const im = e.target.closest("img[data-ph]"); if (im) return viewPw(im.dataset.ph);
   const bt = e.target.closest("button[data-a]"); if (!bt) return;
-  const x = S.pw.get(bt.closest(".pwi").dataset.id); if (!x) return;
+  const x = S.pwd.get(bt.closest(".pwi").dataset.id); if (!x) return;
   const a = bt.dataset.a;
   if (a === "cp") copyText(x.pass, "PASS"); else if (a === "cu") copyText(x.user, "ID"); else if (a === "cl") copyText(x.url, "URL");
   else if (a === "sh") { pwShown.has(x.id) ? pwShown.delete(x.id) : pwShown.add(x.id); renderPw(); }
@@ -1541,6 +1784,7 @@ $("#edIcs").onclick = () => {
 /* ============ 設定 ============ */
 function applyTheme() { const t = S.settings.theme; if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t); }
 function applySettingsUI() {
+  $("#sAiState").textContent = S.settings.aiKey ? "APIキー：登録済み（末尾 " + S.settings.aiKey.slice(-4) + "）" : "APIキー：まだ登録されていません";
   $("#sIdle").value = String(S.settings.idleMin); $("#sHide").checked = S.settings.lockOnHide; $("#sSecretDef").checked = S.settings.secretDefault; $("#sTheme").value = S.settings.theme;
   $("#colorNames").innerHTML = S.settings.colorNames.map((n, i) => `<div class="colname"><i style="background:${COLORS[i]}"></i><input data-cn="${i}" value="${esc(n)}" maxlength="10"></div>`).join("");
   renderCatEdit(); renderTagEdit(); bioUI();
@@ -1709,7 +1953,7 @@ $("#bkFile").addEventListener("change", async ev => {
   if (old) {
     if (!await ask("古い形式のバックアップ（" + when + "）です。\n合体はできないので、今の中身と置き換えます。よろしいですか？", "置き換える", "やめる", true)) return;
     mode = "replace";
-  } else if (S.entries.size === 0) {
+  } else if (S.entries.size === 0 && S.pw.size === 0) {
     if (!await ask("この端末はまだ空なので、バックアップ（" + when + "）をそのまま入れます。\n暗証番号もバックアップと同じになります。", "入れる", "やめる")) return;
     mode = "replace";
   } else {
@@ -1753,11 +1997,11 @@ async function mergeImport(f, head) {
   }
   if (!bk) { toast("暗証番号が違うため、読み込みをやめました", 3500); return; }
   S.busy = true;
-  const st = { add: 0, upd: 0, del: 0, same: 0, media: 0, lost: 0, pw: 0 };
+  const st = { add: 0, upd: 0, del: 0, same: 0, media: 0, lost: 0, pw: 0 }; let pwSkip = false;
   try {
     busy("バックアップを調べています…");
     /* 1回目：中身の一覧と、予定・記録・削除の記録を読む */
-    const inKeys = new Set(), inE = new Map(), inX = new Map(), inP = new Map(), inQ = new Map(); let inS = null, first = true;
+    const inKeys = new Set(), inE = new Map(), inX = new Map(), inP = new Map(), inQ = new Map(); let inS = null, first = true, inPk = null;
     for await (const ln of fileLines(f)) {
       if (first) { first = false; continue; }
       const r = JSON.parse(ln), k = r[0]; inKeys.add(k);
@@ -1766,6 +2010,7 @@ async function mergeImport(f, head) {
       else if (k.startsWith("p:")) inP.set(k.slice(2), await decJ(recOf(r), bk));
       else if (k.startsWith("q:")) inQ.set(k.slice(2), await decJ(recOf(r), bk));
       else if (k === "s") { try { inS = await decJ(recOf(r), bk); } catch (e) {} }
+      else if (k === "pk") { try { inPk = await decJ(recOf(r), bk); } catch (e) {} }
     }
     const locKeys = new Set(await dbKeys()), locX = new Map();
     for (const r of await dbRange("x:", "x:\uffff")) { try { const x = await decJ(r); locX.set(x.id, x); } catch (e) {} }
@@ -1810,22 +2055,53 @@ async function mergeImport(f, head) {
     for (const id of dropMedia) await delMedia(id);
     for (const [le, t] of toDel) { await removeEntry(le, t); st.del++; }
     for (const x of newTombs) await dbPut("rec", "x:" + x.id, await encJ(x));
-    /* PASS帳も同じ決まりで合体（後から直した方を残す・消した物は消えたまま） */
+    /* PASS帳も同じ決まりで合体（後から直した方を残す・消した物は消えたまま）。中身は2つ目の鍵がかかったまま運ぶ */
     const locQ = new Map();
     for (const r of await dbRange("q:", "q:\uffff")) { try { const x = await decJ(r); locQ.set(x.id, x); } catch (e) {} }
-    for (const [id, ip] of inP) {
-      const lp = S.pw.get(id), lq = locQ.get(id);
-      if (lq && lq.t >= (ip.updated || 0)) continue;
-      if (lp && (ip.updated || 0) <= (lp.updated || 0)) continue;
-      S.pw.set(id, ip); await dbPut("rec", "p:" + id, await encJ(ip)); st.pw++;
-    }
-    for (const [id, iq] of inQ) {
-      const lp = S.pw.get(id), lq = locQ.get(id);
-      if (lp && iq.t > (lp.updated || 0)) { await removePw(id, iq.t); st.pw++; }
-      else if (!lp && (!lq || lq.t < iq.t)) await dbPut("rec", "q:" + id, await encJ(iq));
+    const locPk = await getPk(), inV2 = [...inP.values()].some(x => x.z); let inK2 = null, locK2 = null;
+    if (inPk && !locPk) await dbPut("rec", "pk", await encJ(inPk));
+    else if (inPk && locPk && inPk.kid === locPk.kid) { if ((inPk.t || 0) > (locPk.t || 0)) await dbPut("rec", "pk", await encJ(inPk)); }
+    else if (inPk && locPk && inV2) {
+      busy();
+      await info("PASS帳の鍵が、この端末とバックアップで別々に作られています。\nPASS帳も合体するには、両方のPASS帳の暗証番号を入れてください。\n（やめると、PASS帳だけ合体しません）");
+      inK2 = await unlock2(inPk, "バックアップ側のPASS帳の暗証番号", false, true);
+      if (inK2) locK2 = await unlock2(locPk, "この端末のPASS帳の暗証番号", false, true);
+      if (!inK2 || !locK2) pwSkip = true;
+      busy("まとめています…");
+    } else if (!inPk && inV2) pwSkip = true;
+    if (!pwSkip) {
+      const needPm = new Set(), dropPm = [];
+      for (const [id, ip] of inP) {
+        const lp = S.pw.get(id), lq = locQ.get(id);
+        if (lq && lq.t >= (ip.updated || 0)) continue;
+        if (lp && (ip.updated || 0) <= (lp.updated || 0)) continue;
+        if (inK2 && ip.z) { try { ip.z = await enc2(await dec2(ip.z, inK2), locK2); } catch (e) { continue; } }
+        ip.ph = (ip.ph || []).filter(p => locKeys.has("pm:" + p) || inKeys.has("pm:" + p));
+        for (const p of ip.ph) if (!locKeys.has("pm:" + p)) { needPm.add(p); needPm.add(p + "_t"); }
+        if (lp) for (const p of lp.ph || []) if (!ip.ph.includes(p)) dropPm.push(p);
+        S.pw.set(id, ip); await dbPut("rec", "p:" + id, await encJ(ip)); st.pw++;
+      }
+      if (needPm.size) {
+        let f1 = true;
+        for await (const ln of fileLines(f)) {
+          if (f1) { f1 = false; continue; }
+          const r = JSON.parse(ln), k = r[0];
+          if (!k.startsWith("pm:") || !needPm.has(k.slice(3))) continue;
+          let buf = await decB(recOf(r), bk);
+          if (inK2) buf = await enc2B(await dec2B(buf, inK2), locK2);
+          await dbPut("rec", k, await encB(buf));
+        }
+      }
+      for (const p of dropPm) await delPm(p);
+      for (const [id, iq] of inQ) {
+        const lp = S.pw.get(id), lq = locQ.get(id);
+        if (lp && iq.t > (lp.updated || 0)) { await removePw(id, iq.t); st.pw++; }
+        else if (!lp && (!lq || lq.t < iq.t)) await dbPut("rec", "q:" + id, await encJ(iq));
+      }
     }
     if (inS) {
       const s = S.settings;
+      if (!s.aiKey && inS.aiKey) s.aiKey = inS.aiKey;
       for (const t of inS.tags || []) if (!s.tags.includes(t)) s.tags.push(t);
       for (const c of inS.cats || []) if (!s.cats.some(x => x[0] === c[0])) s.cats.push(c);
       s.guidesDone = Object.assign({}, inS.guidesDone || {}, s.guidesDone || {});
@@ -1834,7 +2110,7 @@ async function mergeImport(f, head) {
   } catch (e) { busy(); S.busy = false; toast("合体に失敗しました：" + (e.message || e), 5000); return; }
   busy(); S.busy = false;
   applySettingsUI(); renderAll();
-  await info("合体しました ✓\n\n追加：" + st.add + "件\n更新：" + st.upd + "件\n削除：" + st.del + "件\n変わらず：" + st.same + "件\n写真・動画・録音の取り込み：" + st.media + "件\nPASS帳の反映：" + st.pw + "件" + (st.lost ? "\n\n※文字だけのバックアップのため、写真等" + st.lost + "件は入っていません" : ""));
+  await info("合体しました ✓\n\n追加：" + st.add + "件\n更新：" + st.upd + "件\n削除：" + st.del + "件\n変わらず：" + st.same + "件\n写真・動画・録音の取り込み：" + st.media + "件\nPASS帳の反映：" + (pwSkip ? "しませんでした（PASS帳の暗証番号が確認できなかったため）" : st.pw + "件") + (st.lost ? "\n\n※文字だけのバックアップのため、写真等" + st.lost + "件は入っていません" : ""));
 }
 $("#sWipe").onclick = async () => {
   if (!await ask("手帳の全データ（予定・記録・写真・動画・録音）を消します。\n元に戻せません。", "次へ", "やめる", true)) return;
@@ -1853,8 +2129,9 @@ const QA = [
   ["動画はどのくらい入る？", "iPhoneの空き容量しだいです。1分の動画でおよそ50〜150MB。150MBを超えると確認が出ます（800MBまで）。長い動画は写真アプリで短く切ってから入れると軽くなります。"],
   ["Face IDで開くには？", "「設定 → 🔐機密・ロック → Face ID（顔認証）で開く」をオンにして、今の暗証番号を入れ、Face IDを見せます。次から手帳を開くと自動でFace IDが出て、顔を見せるだけで開きます。<br>※iOS 18以降が必要です。PCやiPhoneごとに、それぞれの端末でオンにします。顔認証がうまくいかないときは、いつでも暗証番号で開けます。<br>※暗証番号を忘れた場合の保険にはなりません（バックアップを戻すときは暗証番号が必要です）。"],
   ["暗証番号を入れたらすぐ開く？", "はい。決めた桁数まで入れた瞬間に、ボタンを押さなくても開きます（この版にしてから最初の1回だけは「開く」ボタンを押してください。そこで桁数を覚えます）。"],
-  ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>名刺の内容は、編集画面の「🪪名刺の内容を読み取る」の枠を長押し →「テキストをスキャン」→ 名刺にかざして「入力」→「振り分ける」ボタン。会社・部署役職・名前・電話・携帯・FAX・メール・住所に自動で分けて、「相手」と「メモ」に入れます（違うところは直せます）。<br>すべてiPhoneの中だけで行い、外には送りません。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
-  ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開き、「＋追加」でサイト名・ID・PASSを入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>予定や写真と同じく暗号化して保存され、バックアップ・PCとの合体にも入ります。<br>※大事なPASSを入れるなら、手帳の暗証番号は<b>英字まじりの長め</b>にしてください。"],
+  ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>名刺の内容は、「設定 → 🤖名刺をAIで読む」にAPIキーを登録しておくと、名刺を入れた時にAIが読み取り、会社・部署役職・名前・電話・携帯・FAX・メール・住所を「相手」と「メモ」に自動で入れます（違うところは直せます）。この時だけ、名刺の写真がインターネット経由でAIに送られます。<br>AIを使いたくない名刺は、編集画面の「AIを使わずに読む」から、iPhoneの「テキストをスキャン」で読み取れます。<br>日付の読み取りはiPhoneの中だけで行います。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
+  ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開きます。<b>PASS帳は二重の鍵</b>で、手帳の暗証番号とは別の「PASS帳専用の暗証番号」を入れて開きます（最初の1回だけ、その番号を決めます）。<br>「＋追加」でサイト名・ID・PASS・メモ・写真（カードや契約書の写しなど）を入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>閉じるとすぐ鍵がかかり、次に開くときもPASS帳の暗証番号が要ります。サイト名も写真も、開けるまで見えません。<br>バックアップ・PCとの合体にも、鍵がかかったまま入ります。"],
+  ["PASS帳の暗証番号を忘れたら？", "取り出す方法はありません（誰にも開けられない作りです）。3回間違えると「PASS帳を空にしてやり直す」が選べますが、入っていたID・PASS・写真は消えます。<br>番号を変えたいときは、PASS帳の一番下の「PASS帳の暗証番号を変える」から。"],
   ["暗証番号を忘れたら？", "暗号の性質上、<b>誰にも開けられません</b>（作った人にも不可能です）。暗証番号は紙に書いて安全な所に保管してください。"],
   ["本当に他人に見られない？", "中身は全部 AES-256 で暗号化され、iPhoneの中だけに保存されます。ネットには送りません。席を立つときは右上の🔒を押してください。"],
   ["予定の時刻に鳴らすには？", "予定を開き「🔔呼び出し」で何分前かを選び、「📅 iPhoneのカレンダーに登録する」→ 出てきた画面で「追加」。手帳を閉じていても鳴ります。"],
@@ -1902,7 +2179,7 @@ const TOURS = [
 ];
 const HELP = [
   { s: "#btnLock", t: "ロック", x: "すぐに手帳を閉じて、暗証番号がないと開けないようにします。" },
-  { s: "#btnPw", t: "PASS帳", x: "各サイトのID・パスワードを暗号化して保存し、一覧からコピーできます。" },
+  { s: "#btnPw", t: "PASS帳", x: "各サイトのID・パスワード・写真を保存し、一覧からコピーできます。手帳とは別の暗証番号で開く、二重の鍵です。" },
   { s: "#btnFind", t: "探す", x: "一覧を開いて、すぐ検索できます。" },
   { s: "#btnHelp", t: "使い方", x: "ガイドとよくある質問を開きます。" },
   { s: "#navAdd", t: "追加", x: "新しい予定を作ります。「月」の画面では選んだ日に作ります。" },
