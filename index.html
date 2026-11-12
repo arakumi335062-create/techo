@@ -251,6 +251,8 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 .pwi .pwl .v{flex:1;min-width:0;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;user-select:text;-webkit-user-select:text}
 .pwi button{flex:none;border:1px solid var(--line);background:var(--surface2);border-radius:8px;height:36px;min-width:44px;padding:0 10px;font-size:13px}
 .pwi button.cp{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.pwsee{display:flex;align-items:center;gap:8px;font-size:14px;color:inherit;opacity:.85;margin:2px 0 12px;min-height:32px;cursor:pointer}
+.pwsee input{width:20px;height:20px;flex:none;margin:0}
 .pwph{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .pwph img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--surface2)}
 .pwph .pwt{position:relative;display:inline-block;line-height:0}
@@ -452,6 +454,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
     <div class="muted" id="pwCount" style="margin-top:8px"></div>
     <div id="pwList"></div>
     <div class="hint" style="margin-top:14px">「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」で貼れます。<br>🔒🔒 PASS帳は二重の鍵です。手帳の暗証番号に加えて、PASS帳専用の暗証番号でもう一度暗号化しています。閉じると鍵がかかり、開くたびに暗証番号が要ります。</div>
+    <div class="card" style="margin:12px 0 0"><div class="row"><label>Face ID（顔認証）で開く<span class="sub" id="pwBioSub">暗証番号の代わりに、顔で開きます</span></label><label class="sw"><input type="checkbox" id="pwBio"><span></span></label></div></div>
     <button class="btn wide" id="pwChg" style="margin-top:12px">PASS帳の暗証番号を変える</button>
     <button class="btn wide" id="pwRec" style="margin-top:8px">🗝 復旧キー（合鍵）を作り直す</button>
     <div class="hint">復旧キーは、PASS帳の暗証番号を忘れたときの合鍵です。紙に控えて金庫などに置いておくと、忘れても開けられます。</div>
@@ -480,7 +483,7 @@ nav.bottom button.plus .ic{background:var(--accent);color:var(--accent-ink);widt
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const te = new TextEncoder(), td = new TextDecoder();
-const APP_VER = "2026.11.12-2"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
+const APP_VER = "2026.11.12-3"; /* 版番号：直すたびに上げる（年.月.日-その日の何回目） */
 const ITER = 600000;
 const CHUNK = 4 * 1024 * 1024;
 const DB_NAME = "systemTecho";
@@ -640,8 +643,8 @@ async function prfToKey(out) {
   const base = await crypto.subtle.importKey("raw", out, "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: BIO_SALT, info: te.encode("wrap") }, base, { name: "AES-GCM", length: 256 }, false, ["wrapKey", "unwrapKey"]);
 }
-async function bioPrf(id) {
-  const a = await navigator.credentials.get({ publicKey: { challenge: rnd(32), rpId: location.hostname, allowCredentials: [{ type: "public-key", id }], userVerification: "required", timeout: 60000, extensions: { prf: { eval: { first: BIO_SALT } } } } });
+async function bioPrf(id, salt = BIO_SALT) {
+  const a = await navigator.credentials.get({ publicKey: { challenge: rnd(32), rpId: location.hostname, allowCredentials: [{ type: "public-key", id }], userVerification: "required", timeout: 60000, extensions: { prf: { eval: { first: salt } } } } });
   const r = a.getClientExtensionResults().prf;
   if (!r || !r.results || !r.results.first) throw new Error("NOPRF");
   return r.results.first;
@@ -1624,23 +1627,74 @@ async function unlock2(pk, title, extractable, noReset) {
     if (c !== "a") return null;
   }
 }
+/* PASS帳のFace ID：顔認証が通ったときだけ出てくる秘密の値で、PASS帳の鍵を包んでこの端末だけに保存する（手帳本体とは別の値） */
+const BIO2_SALT = te.encode("systemTecho-faceid-pass-v1");
+async function prf2Key(out) {
+  const base = await crypto.subtle.importKey("raw", out, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: BIO2_SALT, info: te.encode("wrap2") }, base, { name: "AES-GCM", length: 256 }, false, ["wrapKey", "unwrapKey"]);
+}
+async function getB2(pk) { const b = await dbGet("meta", "b2"); return b && pk && b.kid === pk.kid ? b : null; }
+async function bio2Enable(master, pk) {
+  if (!window.PublicKeyCredential || !navigator.credentials) { await info("この端末・ブラウザでは顔認証が使えません。\n暗証番号で開いてください。"); return false; }
+  try {
+    const meta = await dbGet("meta", "k"); let id = meta && meta.bio ? meta.bio.id : null, out = null;
+    if (!id) {
+      const c = await navigator.credentials.create({ publicKey: {
+        rp: { name: "システム手帳", id: location.hostname }, user: { id: rnd(16), name: "techo-pass", displayName: "システム手帳 PASS帳" },
+        challenge: rnd(32), pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "required", userVerification: "required" },
+        timeout: 60000, extensions: { prf: { eval: { first: BIO2_SALT } } } } });
+      const ext = c.getClientExtensionResults().prf;
+      if (!ext || ext.enabled === false) throw new Error("NOPRF");
+      id = new Uint8Array(c.rawId); out = ext.results && ext.results.first;
+      if (!out) await info("もう一度、Face IDで確認します");
+    }
+    if (!out) out = await bioPrf(id, BIO2_SALT);
+    const k = await prf2Key(out), iv = rnd(12);
+    const ct = await crypto.subtle.wrapKey("raw", master, k, { name: "AES-GCM", iv });
+    await dbPut("meta", "b2", { id, iv, ct, kid: pk.kid, at: Date.now() });
+    toast("PASS帳をFace IDで開けるようにしました 🙂", 3000); return true;
+  } catch (e) {
+    if (e && e.message === "NOPRF") await info("この端末では顔認証の鍵の仕組み（PRF）が使えませんでした。\niPhoneはiOS 18以降が必要です。暗証番号で開いてください。");
+    else if (e && e.name === "NotAllowedError") toast("取り消しました");
+    else await info("Face IDを設定できませんでした：" + (e && (e.message || e.name) || e));
+    return false;
+  }
+}
+async function bio2Unlock(b2, extractable) {
+  const k = await prf2Key(await bioPrf(b2.id, BIO2_SALT));
+  return crypto.subtle.unwrapKey("raw", b2.ct, k, { name: "AES-GCM", iv: b2.iv }, { name: "AES-GCM" }, !!extractable, ["encrypt", "decrypt"]);
+}
+async function pwBioUI() {
+  const on = !!(await getB2(await getPk()));
+  $("#pwBio").checked = on; $("#pwBioSub").textContent = on ? "オン：🔑を押すと顔で開きます（暗証番号でも開けます）" : "暗証番号の代わりに、顔で開きます";
+}
+$("#pwBio").onchange = async e => {
+  const pk = await getPk(); if (!pk) return;
+  if (e.target.checked) { const m = await unlock2(pk, "今のPASS帳の暗証番号", true, true); if (m) await bio2Enable(m, pk); }
+  else { await dbDel("meta", "b2"); toast("PASS帳のFace IDをやめました（暗証番号で開きます）"); }
+  pwBioUI();
+};
 async function resetPw() {
   if (!await ask("PASS帳に入っているID・PASS・写真をすべて消します。\n元に戻せません。", "次へ", "やめる", true)) return;
   if (!await ask("本当に消しますか？", "全部消す", "やめる", true)) return;
   for (const id of [...S.pw.keys()]) await removePw(id);
-  await dbDel("rec", "pk");
+  await dbDel("rec", "pk"); await dbDel("meta", "b2");
   toast("PASS帳を空にしました。🔑を押すと、新しい暗証番号から決め直せます", 4500);
 }
 async function openPw() {
   if (!S.unlocked || S.busy) return;
-  let pk = await getPk(), k2 = null, newRec = "";
+  let pk = await getPk(), k2 = null, newRec = "", fresh = false;
   if (!pk) {
     const p = await askNewPass2("PASS帳専用の暗証番号を決めます", "手帳を開く暗証番号とは別のものにします。PASS帳を開くたびに入力します。\n忘れると中身は取り出せません。");
     if (p === null) return;
     busy("準備中…");
-    try { const m = await newMaster(); pk = await makePk(m, p); newRec = genRec(); pk.rec = await wrapRec(m, newRec); await dbPut("rec", "pk", await encJ(pk)); k2 = m; } finally { busy(); }
+    try { const m = await newMaster(); pk = await makePk(m, p); newRec = genRec(); pk.rec = await wrapRec(m, newRec); await dbPut("rec", "pk", await encJ(pk)); k2 = m; fresh = true; } finally { busy(); }
   } else {
-    k2 = await unlock2(pk, null, !pk.rec); if (!k2) return;
+    const b2 = await getB2(pk);
+    if (b2) { try { k2 = await bio2Unlock(b2, !pk.rec); } catch (e) { k2 = null; if (!(e && e.name === "NotAllowedError")) toast("顔認証で開けませんでした。暗証番号を入れてください", 3000); } }
+    if (!k2) k2 = await unlock2(pk, null, !pk.rec);
+    if (!k2) return;
     if (!pk.rec) { /* 復旧キーがまだ無い手帳には、ここで作る */
       busy("準備中…");
       try { const cur = await getPk(); if (cur && !cur.rec) { newRec = genRec(); cur.rec = await wrapRec(k2, newRec); await dbPut("rec", "pk", await encJ(cur)); } } catch (e) { newRec = ""; } finally { busy(); }
@@ -1661,10 +1715,11 @@ async function openPw() {
       }
     }
   } finally { busy(); }
-  pwShown.clear(); $("#pwQ").value = ""; renderPw();
+  pwShown.clear(); $("#pwQ").value = ""; renderPw(); pwBioUI();
   $("#pw").classList.remove("hidden"); $("#pw").scrollTop = 0; document.body.style.overflow = "hidden";
   if (bad) toast(bad + "件は、別の暗証番号で鍵がかかっているため開けません", 5000);
   if (newRec) await showRec(newRec);
+  if (fresh && window.PublicKeyCredential && S.key2 === k2 && await ask("PASS帳を、Face ID（顔認証）でも開けるようにしますか？\nあとから、PASS帳の一番下で切り替えられます。", "Face IDを使う", "暗証番号だけ")) { await bio2Enable(k2, pk); pwBioUI(); }
 }
 function closePw() {
   if (pwEd) { const a = pwEd.added.slice(); pwEd = null; a.forEach(id => delPm(id)); }
@@ -2198,6 +2253,8 @@ const QA = [
   ["暗証番号を入れたらすぐ開く？", "はい。決めた桁数まで入れた瞬間に、ボタンを押さなくても開きます（この版にしてから最初の1回だけは「開く」ボタンを押してください。そこで桁数を覚えます）。"],
   ["名刺を交換した日を残すには？", "今日の画面の「🪪名刺」を押して、名刺を撮るか、前に撮った名刺の写真を選びます。<br>写真の中に入っている<b>撮影日時</b>を読み取り、その日の記録として自動で入れます（月の画面にも点が出ます）。何枚かまとめて選ぶと、それぞれ撮った日に1件ずつ入ります。<br>名刺の内容は、「設定 → 🤖名刺をAIで読む」にAPIキーを登録しておくと、名刺を入れた時にAIが読み取り、会社・部署役職・名前・電話・携帯・FAX・メール・住所を「相手」と「メモ」に自動で入れます（違うところは直せます）。この時だけ、名刺の写真がインターネット経由でAIに送られます。<br>AIを使いたくない名刺は、編集画面の「AIを使わずに読む」から、iPhoneの「テキストをスキャン」で読み取れます。<br>日付の読み取りはiPhoneの中だけで行います。あとで「#名刺」のタグや相手の名前で探せます。<br>※LINEなどで受け取った写真やスクリーンショットには撮影日が入っていないことがあり、そのときは今日の日付になります。"],
   ["サイトのID・PASSを保存するには？", "右上の「🔑」でPASS帳を開きます。<b>PASS帳は二重の鍵</b>で、手帳の暗証番号とは別の「PASS帳専用の暗証番号」を入れて開きます（最初の1回だけ、その番号を決めます。このとき表示される復旧キーは紙に控えてください）。<br>「＋追加」でサイト名・ID・PASS・メモ・写真（カードや契約書の写しなど）を入れて保存します。<br>使うときは、一覧の「コピー」を押してから、相手のサイトの入力欄を長押し →「ペースト」。PASSはふだん「••••」で隠れていて、「見る」で表示できます。<br>閉じるとすぐ鍵がかかり、次に開くときもPASS帳の暗証番号が要ります。サイト名も写真も、開けるまで見えません。<br>バックアップ・PCとの合体にも、鍵がかかったまま入ります。"],
+  ["暗証番号を打つとき、文字が見えない", "暗証番号を入れる欄の下にある「入力した文字を表示する」にチェックを入れると、打った文字がそのまま見えます。一度チェックすると、次からも表示されます（人に見られそうな場所では外してください）。"],
+  ["PASS帳をFace ID（顔）で開きたい", "PASS帳の一番下の「Face ID（顔認証）で開く」をオンにします（PASS帳の暗証番号を1回入れます）。次からは🔑を押すと顔で開きます。顔で開けないときは、暗証番号でも開けます。<br>Face IDは端末ごとの設定です。iPhoneとPCの両方で使うなら、それぞれでオンにしてください。"],
   ["PASS帳の暗証番号を忘れたら？", "<b>復旧キー（合鍵）</b>で開けられます。PASS帳の暗証番号を決めたときに表示される20文字で、紙に控えて金庫などに置いておきます。<br>忘れたときは、🔑 → 間違った番号でOK →「🗝復旧キーで開ける」→ 復旧キーを入れる → 新しい暗証番号を決める、の順です。<br>控えをなくしたら、開けられるうちに、PASS帳の一番下の「復旧キーを作り直す」で新しく作ってください。<br>暗証番号も復旧キーも両方なくすと、開ける方法はありません（その場合は「PASS帳を空にしてやり直す」になります）。"],
   ["暗証番号を忘れたら？", "暗号の性質上、<b>誰にも開けられません</b>（作った人にも不可能です）。暗証番号は紙に書いて安全な所に保管してください。"],
   ["本当に他人に見られない？", "中身は全部 AES-256 で暗号化され、iPhoneの中だけに保存されます。ネットには送りません。席を立つときは右上の🔒を押してください。"],
@@ -2364,6 +2421,26 @@ function showNotice() {
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
   }
 })();
+
+/* ============ 暗証番号の入力欄に「入力した文字を表示する」を付ける ============ */
+let seePw = false; try { seePw = localStorage.getItem("techoSee") === "1"; } catch (e) {}
+function applySee() { $$("input[data-see]").forEach(i => { i.type = seePw ? "text" : "password"; }); $$(".pwsee input").forEach(c => { c.checked = seePw; }); }
+function addSee(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('input[type="password"]:not([data-see])').forEach(inp => {
+    inp.dataset.see = "1"; const par = inp.parentElement;
+    let lb = [...par.children].find(x => x.classList && x.classList.contains("pwsee"));
+    if (!lb) {
+      lb = document.createElement("label"); lb.className = "pwsee"; lb.innerHTML = '<input type="checkbox"><span>入力した文字を表示する</span>';
+      lb.firstChild.addEventListener("change", ev => { seePw = ev.target.checked; try { localStorage.setItem("techoSee", seePw ? "1" : "0"); } catch (e) {} applySee(); });
+    }
+    const all = [...par.children].filter(x => x.tagName === "INPUT" && x.dataset.see);
+    all[all.length - 1].after(lb);
+    inp.type = seePw ? "text" : "password"; lb.firstChild.checked = seePw;
+  });
+}
+addSee(document);
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) addSee(n.parentElement || n); }).observe(document.body, { childList: true, subtree: true });
 
 /* ============ 起動 ============ */
 $$(".appver").forEach(el => { el.textContent = "Ver " + APP_VER; });
